@@ -5,20 +5,34 @@
 <meta charset="UTF-8">
 <title>海洋三消遊戲</title>
 <style>
-  body {
-    background: #0b2a3c;
-    display: flex;
-    justify-content: center;
-    margin-top: 20px;
-  }
-  canvas {
-    background: #0e3f5a;
-    border: 3px solid white;
-    cursor: pointer;
-  }
-</style>
+body {
+  background: #0b2a3c;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: white;
+  font-family: sans-serif;
+}
+
+#ui {
+margin: 10px;
+font-size: 20px;
+}
+
+canvas {
+background: #0e3f5a;
+border: 3px solid white;
+cursor: pointer;
+} </style>
+
 </head>
 <body>
+
+<div id="ui">
+  分數：<span id="score">0</span>　
+  Combo：<span id="combo">0</span>　
+  時間：<span id="time">60</span>
+</div>
 
 <canvas id="game" width="500" height="500"></canvas>
 
@@ -37,6 +51,14 @@ let board = [];
 let selected = null;
 let isAnimating = false;
 
+let score = 0;
+let combo = 0;
+let timeLeft = 60;
+let gameOver = false;
+
+// 淡出效果
+let fading = [];
+
 // 初始化
 function initBoard() {
   board = [];
@@ -49,7 +71,6 @@ function initBoard() {
   }
 }
 
-// 隨機
 function randomType() {
   return Math.floor(Math.random() * TYPES);
 }
@@ -60,14 +81,22 @@ function draw() {
 
   for (let y = 0; y < SIZE; y++) {
     for (let x = 0; x < SIZE; x++) {
-      drawTile(board[y][x], x, y);
+      let type = board[y][x];
+      if (type != null) drawTile(type, x, y);
     }
   }
 
-  // 畫選取框
+  // 畫淡出
+  fading.forEach(f => {
+    ctx.globalAlpha = f.alpha;
+    drawTile(f.type, f.x, f.y);
+    ctx.globalAlpha = 1;
+  });
+
+  // 選取框（粗）
   if (selected) {
     ctx.strokeStyle = "yellow";
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 6;
     ctx.strokeRect(
       selected.x * TILE,
       selected.y * TILE,
@@ -77,7 +106,7 @@ function draw() {
   }
 }
 
-// 畫圖
+// 畫單格
 function drawTile(type, x, y) {
   const sx = (type % 2) * 256;
   const sy = Math.floor(type / 2) * 256;
@@ -92,7 +121,7 @@ function drawTile(type, x, y) {
 
 // 點擊
 canvas.addEventListener("click", (e) => {
-  if (isAnimating) return;
+  if (isAnimating || gameOver) return;
 
   const rect = canvas.getBoundingClientRect();
   const x = Math.floor((e.clientX - rect.left) / TILE);
@@ -104,7 +133,6 @@ canvas.addEventListener("click", (e) => {
     const dx = Math.abs(selected.x - x);
     const dy = Math.abs(selected.y - y);
 
-    // 相鄰才交換
     if ((dx === 1 && dy === 0) || (dx === 0 && dy === 1)) {
       swap(selected, {x, y});
       selected = null;
@@ -119,6 +147,7 @@ canvas.addEventListener("click", (e) => {
 // 交換
 function swap(a, b) {
   isAnimating = true;
+  combo = 0;
 
   let temp = board[a.y][a.x];
   board[a.y][a.x] = board[b.y][b.x];
@@ -135,55 +164,33 @@ function swap(a, b) {
       isAnimating = false;
       draw();
     } else {
-      resolveMatches();
+      resolveMatches(true);
     }
   }, 200);
 }
 
-// 找三消
+// 找消除
 function findMatches() {
   let matches = [];
 
-  // 橫
   for (let y = 0; y < SIZE; y++) {
-    let count = 1;
-    for (let x = 1; x < SIZE; x++) {
-      if (board[y][x] === board[y][x - 1]) {
-        count++;
-      } else {
-        if (count >= 3) {
-          for (let k = 0; k < count; k++) {
-            matches.push([y, x - 1 - k]);
-          }
-        }
-        count = 1;
-      }
-    }
-    if (count >= 3) {
-      for (let k = 0; k < count; k++) {
-        matches.push([y, SIZE - 1 - k]);
+    for (let x = 0; x < SIZE - 2; x++) {
+      let t = board[y][x];
+      if (t !== null &&
+          t === board[y][x+1] &&
+          t === board[y][x+2]) {
+        matches.push([y,x],[y,x+1],[y,x+2]);
       }
     }
   }
 
-  // 直
   for (let x = 0; x < SIZE; x++) {
-    let count = 1;
-    for (let y = 1; y < SIZE; y++) {
-      if (board[y][x] === board[y - 1][x]) {
-        count++;
-      } else {
-        if (count >= 3) {
-          for (let k = 0; k < count; k++) {
-            matches.push([y - 1 - k, x]);
-          }
-        }
-        count = 1;
-      }
-    }
-    if (count >= 3) {
-      for (let k = 0; k < count; k++) {
-        matches.push([SIZE - 1 - k, x]);
+    for (let y = 0; y < SIZE - 2; y++) {
+      let t = board[y][x];
+      if (t !== null &&
+          t === board[y+1][x] &&
+          t === board[y+2][x]) {
+        matches.push([y,x],[y+1,x],[y+2,x]);
       }
     }
   }
@@ -192,27 +199,67 @@ function findMatches() {
 }
 
 // 消除流程
-function resolveMatches() {
+function resolveMatches(isPlayer) {
   let matches = findMatches();
-
   if (matches.length === 0) {
+    score += combo * 10;
+    updateUI();
     isAnimating = false;
     return;
   }
 
-  // 消除
-  for (let [y, x] of matches) {
-    board[y][x] = null;
-  }
+  combo++;
 
-  draw();
+  let unique = {};
+  matches.forEach(([y,x]) => unique[y+"_"+x] = true);
 
-  setTimeout(() => {
+  let tiles = Object.keys(unique).map(k=>{
+    let [y,x]=k.split("_").map(Number);
+    return {y,x,type:board[y][x]};
+  });
+
+  // 加分
+  tiles.forEach(()=>{
+    score += isPlayer ? 10 : 5;
+  });
+
+  updateUI();
+
+  // 加入淡出
+  tiles.forEach(t=>{
+    fading.push({x:t.x,y:t.y,type:t.type,alpha:1});
+    board[t.y][t.x] = null;
+  });
+
+  animateFade(()=>{
     dropTiles();
+    resolveMatches(false);
+  });
+}
+
+// 淡出動畫
+function animateFade(callback) {
+  let duration = 300;
+  let start = performance.now();
+
+  function frame(now) {
+    let p = (now - start) / duration;
+
+    fading.forEach(f=>{
+      f.alpha = 1 - p;
+    });
+
     draw();
 
-    setTimeout(resolveMatches, 200);
-  }, 200);
+    if (p < 1) {
+      requestAnimationFrame(frame);
+    } else {
+      fading = [];
+      callback();
+    }
+  }
+
+  requestAnimationFrame(frame);
 }
 
 // 掉落
@@ -221,20 +268,35 @@ function dropTiles() {
     let col = [];
 
     for (let y = SIZE - 1; y >= 0; y--) {
-      if (board[y][x] != null) {
-        col.push(board[y][x]);
-      }
+      if (board[y][x] != null) col.push(board[y][x]);
     }
 
-    while (col.length < SIZE) {
-      col.push(randomType());
-    }
+    while (col.length < SIZE) col.push(randomType());
 
     for (let y = SIZE - 1; y >= 0; y--) {
       board[y][x] = col[SIZE - 1 - y];
     }
   }
 }
+
+// UI
+function updateUI() {
+  document.getElementById("score").innerText = score;
+  document.getElementById("combo").innerText = combo;
+}
+
+// 倒數
+setInterval(()=>{
+  if (gameOver) return;
+
+  timeLeft--;
+  document.getElementById("time").innerText = timeLeft;
+
+  if (timeLeft <= 0) {
+    gameOver = true;
+    alert("時間到！分數：" + score);
+  }
+},1000);
 
 // 啟動
 img.onload = () => {
