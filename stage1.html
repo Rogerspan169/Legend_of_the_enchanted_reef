@@ -154,104 +154,137 @@ function swap(a, b) {
   board[b.y][b.x] = temp;
 
   setTimeout(() => {
-    let matches = findMatches();
+let matches = findMatches();
 
-    if (matches.length === 0) {
-      // 換回來
-      let temp = board[a.y][a.x];
-      board[a.y][a.x] = board[b.y][b.x];
-      board[b.y][b.x] = temp;
-      isAnimating = false;
-      draw();
-    } else {
-      resolveMatches(true);
-    }
-  }, 200);
+if (matches.length === 0) {
+// 換回來
+let temp = board[a.y][a.x];
+board[a.y][a.x] = board[b.y][b.x];
+board[b.y][b.x] = temp;
+
+```
+isAnimating = false; // ⭐ 保險
+draw();
+```
+
+} else {
+resolveMatches(true);
 }
+}, 200);
+
 
 // 找消除
 function findMatches() {
-let matches = [];
+let found = {};
 
-// ===== 橫向檢查 =====
+// 橫向
 for (let y = 0; y < SIZE; y++) {
 let count = 1;
 
 ```
 for (let x = 1; x < SIZE; x++) {
-  if (board[y][x] !== null && board[y][x] === board[y][x - 1]) {
+  if (board[y][x] !== null && board[y][x] === board[y][x-1]) {
     count++;
   } else {
     if (count >= 3) {
       for (let k = 0; k < count; k++) {
-        matches.push([y, x - 1 - k]);
+        found[(y) + "_" + (x-1-k)] = true;
       }
     }
     count = 1;
   }
 }
 
-// 收尾
 if (count >= 3) {
   for (let k = 0; k < count; k++) {
-    matches.push([y, SIZE - 1 - k]);
+    found[y + "_" + (SIZE-1-k)] = true;
   }
 }
 ```
 
 }
 
-// ===== 直向檢查 =====
+// 直向
 for (let x = 0; x < SIZE; x++) {
 let count = 1;
 
 ```
 for (let y = 1; y < SIZE; y++) {
-  if (board[y][x] !== null && board[y][x] === board[y - 1][x]) {
+  if (board[y][x] !== null && board[y][x] === board[y-1][x]) {
     count++;
   } else {
     if (count >= 3) {
       for (let k = 0; k < count; k++) {
-        matches.push([y - 1 - k, x]);
+        found[(y-1-k) + "_" + x] = true;
       }
     }
     count = 1;
   }
 }
 
-// 收尾
 if (count >= 3) {
   for (let k = 0; k < count; k++) {
-    matches.push([SIZE - 1 - k, x]);
+    found[(SIZE-1-k) + "_" + x] = true;
   }
 }
 ```
 
 }
 
-return matches;
+// 轉回陣列
+return Object.keys(found).map(k => {
+let [y,x] = k.split("_").map(Number);
+return [y,x];
+});
 }
 
 
 // 消除流程
 function resolveMatches(isPlayer) {
-  let matches = findMatches();
-  if (matches.length === 0) {
-    score += combo * 10;
-    updateUI();
-    isAnimating = false;
-    return;
-  }
+let matches = findMatches();
 
-  combo++;
+if (matches.length === 0) {
+// ⭐ 保證一定解鎖
+score += combo * 10;
+updateUI();
+isAnimating = false;
+return;
+}
 
-  let unique = {};
-  matches.forEach(([y,x]) => unique[y+"_"+x] = true);
+combo++;
 
-  let tiles = Object.keys(unique).map(k=>{
-    let [y,x]=k.split("_").map(Number);
-    return {y,x,type:board[y][x]};
-  });
+let tiles = matches.map(([y,x]) => ({
+y, x, type: board[y][x]
+}));
+
+// ⭐ 計分
+tiles.forEach(()=>{
+score += isPlayer ? 10 : 5;
+});
+
+updateUI();
+
+// ⭐ 清除 + 淡出
+tiles.forEach(t=>{
+if (board[t.y][t.x] !== null) {
+fading.push({x:t.x,y:t.y,type:t.type,alpha:1});
+board[t.y][t.x] = null;
+}
+});
+
+animateFade(()=>{
+dropTiles();
+
+```
+// ⭐ 用 setTimeout 避免同步卡死
+setTimeout(() => {
+  resolveMatches(false);
+}, 50);
+```
+
+});
+}
+
 
   // 加分
   tiles.forEach(()=>{
