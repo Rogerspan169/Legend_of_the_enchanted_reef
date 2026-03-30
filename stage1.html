@@ -171,32 +171,67 @@ function swap(a, b) {
 
 // 找消除
 function findMatches() {
-  let matches = [];
+let matches = [];
 
-  for (let y = 0; y < SIZE; y++) {
-    for (let x = 0; x < SIZE - 2; x++) {
-      let t = board[y][x];
-      if (t !== null &&
-          t === board[y][x+1] &&
-          t === board[y][x+2]) {
-        matches.push([y,x],[y,x+1],[y,x+2]);
+// ===== 橫向檢查 =====
+for (let y = 0; y < SIZE; y++) {
+let count = 1;
+
+```
+for (let x = 1; x < SIZE; x++) {
+  if (board[y][x] !== null && board[y][x] === board[y][x - 1]) {
+    count++;
+  } else {
+    if (count >= 3) {
+      for (let k = 0; k < count; k++) {
+        matches.push([y, x - 1 - k]);
       }
     }
+    count = 1;
   }
-
-  for (let x = 0; x < SIZE; x++) {
-    for (let y = 0; y < SIZE - 2; y++) {
-      let t = board[y][x];
-      if (t !== null &&
-          t === board[y+1][x] &&
-          t === board[y+2][x]) {
-        matches.push([y,x],[y+1,x],[y+2,x]);
-      }
-    }
-  }
-
-  return matches;
 }
+
+// 收尾
+if (count >= 3) {
+  for (let k = 0; k < count; k++) {
+    matches.push([y, SIZE - 1 - k]);
+  }
+}
+```
+
+}
+
+// ===== 直向檢查 =====
+for (let x = 0; x < SIZE; x++) {
+let count = 1;
+
+```
+for (let y = 1; y < SIZE; y++) {
+  if (board[y][x] !== null && board[y][x] === board[y - 1][x]) {
+    count++;
+  } else {
+    if (count >= 3) {
+      for (let k = 0; k < count; k++) {
+        matches.push([y - 1 - k, x]);
+      }
+    }
+    count = 1;
+  }
+}
+
+// 收尾
+if (count >= 3) {
+  for (let k = 0; k < count; k++) {
+    matches.push([SIZE - 1 - k, x]);
+  }
+}
+```
+
+}
+
+return matches;
+}
+
 
 // 消除流程
 function resolveMatches(isPlayer) {
