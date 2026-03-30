@@ -1,1 +1,181 @@
+<!DOCTYPE html>
 
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>海洋三消遊戲</title>
+<style>
+  body {
+    background: #0b2a3c;
+    display: flex;
+    justify-content: center;
+    margin-top: 20px;
+  }
+  canvas {
+    background: #0e3f5a;
+    border: 3px solid white;
+  }
+</style>
+</head>
+<body>
+
+<canvas id="game" width="500" height="500"></canvas>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+const SIZE = 10;
+const TILE = 50;
+
+// 4種物件
+const TYPES = 4;
+
+// 載入圖片
+const img = new Image();
+img.src = "sprite_sheet.png";
+
+// 棋盤
+let board = [];
+
+// 初始化棋盤
+function initBoard() {
+  board = [];
+  for (let y = 0; y < SIZE; y++) {
+    let row = [];
+    for (let x = 0; x < SIZE; x++) {
+      row.push(randomType());
+    }
+    board.push(row);
+  }
+}
+
+// 隨機類型
+function randomType() {
+  return Math.floor(Math.random() * TYPES);
+}
+
+// 畫圖
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  for (let y = 0; y < SIZE; y++) {
+    for (let x = 0; x < SIZE; x++) {
+      let type = board[y][x];
+      drawTile(type, x * TILE, y * TILE);
+    }
+  }
+}
+
+// 畫單個物件（來自 sprite sheet）
+function drawTile(type, x, y) {
+  const sx = (type % 2) * 256;
+  const sy = Math.floor(type / 2) * 256;
+
+  ctx.drawImage(
+    img,
+    sx, sy, 256, 256,
+    x, y, TILE, TILE
+  );
+}
+
+// 找可消除
+function findMatches() {
+  let matches = [];
+
+  // 橫向
+  for (let y = 0; y < SIZE; y++) {
+    let count = 1;
+    for (let x = 1; x < SIZE; x++) {
+      if (board[y][x] === board[y][x - 1]) {
+        count++;
+      } else {
+        if (count >= 3) {
+          for (let k = 0; k < count; k++) {
+            matches.push([y, x - 1 - k]);
+          }
+        }
+        count = 1;
+      }
+    }
+    if (count >= 3) {
+      for (let k = 0; k < count; k++) {
+        matches.push([y, SIZE - 1 - k]);
+      }
+    }
+  }
+
+  // 直向
+  for (let x = 0; x < SIZE; x++) {
+    let count = 1;
+    for (let y = 1; y < SIZE; y++) {
+      if (board[y][x] === board[y - 1][x]) {
+        count++;
+      } else {
+        if (count >= 3) {
+          for (let k = 0; k < count; k++) {
+            matches.push([y - 1 - k, x]);
+          }
+        }
+        count = 1;
+      }
+    }
+    if (count >= 3) {
+      for (let k = 0; k < count; k++) {
+        matches.push([SIZE - 1 - k, x]);
+      }
+    }
+  }
+
+  return matches;
+}
+
+// 消除
+function removeMatches(matches) {
+  for (let [y, x] of matches) {
+    board[y][x] = null;
+  }
+}
+
+// 掉落
+function dropTiles() {
+  for (let x = 0; x < SIZE; x++) {
+    let col = [];
+    
+    for (let y = SIZE - 1; y >= 0; y--) {
+      if (board[y][x] != null) {
+        col.push(board[y][x]);
+      }
+    }
+
+    while (col.length < SIZE) {
+      col.push(randomType());
+    }
+
+    for (let y = SIZE - 1; y >= 0; y--) {
+      board[y][x] = col[SIZE - 1 - y];
+    }
+  }
+}
+
+// 主邏輯（自動消）
+function gameLoop() {
+  let matches = findMatches();
+
+  if (matches.length > 0) {
+    removeMatches(matches);
+    dropTiles();
+  }
+
+  draw();
+}
+
+// 啟動
+img.onload = () => {
+  initBoard();
+  setInterval(gameLoop, 500);
+};
+</script>
+
+</body>
+</html>
