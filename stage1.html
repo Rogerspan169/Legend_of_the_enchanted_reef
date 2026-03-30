@@ -162,10 +162,8 @@ let temp = board[a.y][a.x];
 board[a.y][a.x] = board[b.y][b.x];
 board[b.y][b.x] = temp;
 
-```
 isAnimating = false; // ⭐ 保險
 draw();
-```
 
 } else {
 resolveMatches(true);
@@ -181,7 +179,6 @@ let found = {};
 for (let y = 0; y < SIZE; y++) {
 let count = 1;
 
-```
 for (let x = 1; x < SIZE; x++) {
   if (board[y][x] !== null && board[y][x] === board[y][x-1]) {
     count++;
@@ -200,7 +197,6 @@ if (count >= 3) {
     found[y + "_" + (SIZE-1-k)] = true;
   }
 }
-```
 
 }
 
@@ -208,7 +204,6 @@ if (count >= 3) {
 for (let x = 0; x < SIZE; x++) {
 let count = 1;
 
-```
 for (let y = 1; y < SIZE; y++) {
   if (board[y][x] !== null && board[y][x] === board[y-1][x]) {
     count++;
@@ -227,7 +222,6 @@ if (count >= 3) {
     found[(SIZE-1-k) + "_" + x] = true;
   }
 }
-```
 
 }
 
@@ -275,12 +269,10 @@ board[t.y][t.x] = null;
 animateFade(()=>{
 dropTiles();
 
-```
 // ⭐ 用 setTimeout 避免同步卡死
 setTimeout(() => {
   resolveMatches(false);
 }, 50);
-```
 
 });
 }
