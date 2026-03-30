@@ -14,6 +14,7 @@
   canvas {
     background: #0e3f5a;
     border: 3px solid white;
+    cursor: pointer;
   }
 </style>
 </head>
@@ -27,18 +28,16 @@ const ctx = canvas.getContext("2d");
 
 const SIZE = 10;
 const TILE = 50;
-
-// 4種物件
 const TYPES = 4;
 
-// 載入圖片
 const img = new Image();
 img.src = "sprite_sheet.png";
 
-// 棋盤
 let board = [];
+let selected = null;
+let isAnimating = false;
 
-// 初始化棋盤
+// 初始化
 function initBoard() {
   board = [];
   for (let y = 0; y < SIZE; y++) {
@@ -50,24 +49,35 @@ function initBoard() {
   }
 }
 
-// 隨機類型
+// 隨機
 function randomType() {
   return Math.floor(Math.random() * TYPES);
 }
 
-// 畫圖
+// 畫面
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   for (let y = 0; y < SIZE; y++) {
     for (let x = 0; x < SIZE; x++) {
-      let type = board[y][x];
-      drawTile(type, x * TILE, y * TILE);
+      drawTile(board[y][x], x, y);
     }
+  }
+
+  // 畫選取框
+  if (selected) {
+    ctx.strokeStyle = "yellow";
+    ctx.lineWidth = 3;
+    ctx.strokeRect(
+      selected.x * TILE,
+      selected.y * TILE,
+      TILE,
+      TILE
+    );
   }
 }
 
-// 畫單個物件（來自 sprite sheet）
+// 畫圖
 function drawTile(type, x, y) {
   const sx = (type % 2) * 256;
   const sy = Math.floor(type / 2) * 256;
@@ -75,15 +85,66 @@ function drawTile(type, x, y) {
   ctx.drawImage(
     img,
     sx, sy, 256, 256,
-    x, y, TILE, TILE
+    x * TILE, y * TILE,
+    TILE, TILE
   );
 }
 
-// 找可消除
+// 點擊
+canvas.addEventListener("click", (e) => {
+  if (isAnimating) return;
+
+  const rect = canvas.getBoundingClientRect();
+  const x = Math.floor((e.clientX - rect.left) / TILE);
+  const y = Math.floor((e.clientY - rect.top) / TILE);
+
+  if (!selected) {
+    selected = {x, y};
+  } else {
+    const dx = Math.abs(selected.x - x);
+    const dy = Math.abs(selected.y - y);
+
+    // 相鄰才交換
+    if ((dx === 1 && dy === 0) || (dx === 0 && dy === 1)) {
+      swap(selected, {x, y});
+      selected = null;
+    } else {
+      selected = {x, y};
+    }
+  }
+
+  draw();
+});
+
+// 交換
+function swap(a, b) {
+  isAnimating = true;
+
+  let temp = board[a.y][a.x];
+  board[a.y][a.x] = board[b.y][b.x];
+  board[b.y][b.x] = temp;
+
+  setTimeout(() => {
+    let matches = findMatches();
+
+    if (matches.length === 0) {
+      // 換回來
+      let temp = board[a.y][a.x];
+      board[a.y][a.x] = board[b.y][b.x];
+      board[b.y][b.x] = temp;
+      isAnimating = false;
+      draw();
+    } else {
+      resolveMatches();
+    }
+  }, 200);
+}
+
+// 找三消
 function findMatches() {
   let matches = [];
 
-  // 橫向
+  // 橫
   for (let y = 0; y < SIZE; y++) {
     let count = 1;
     for (let x = 1; x < SIZE; x++) {
@@ -105,7 +166,7 @@ function findMatches() {
     }
   }
 
-  // 直向
+  // 直
   for (let x = 0; x < SIZE; x++) {
     let count = 1;
     for (let y = 1; y < SIZE; y++) {
@@ -130,18 +191,35 @@ function findMatches() {
   return matches;
 }
 
-// 消除
-function removeMatches(matches) {
+// 消除流程
+function resolveMatches() {
+  let matches = findMatches();
+
+  if (matches.length === 0) {
+    isAnimating = false;
+    return;
+  }
+
+  // 消除
   for (let [y, x] of matches) {
     board[y][x] = null;
   }
+
+  draw();
+
+  setTimeout(() => {
+    dropTiles();
+    draw();
+
+    setTimeout(resolveMatches, 200);
+  }, 200);
 }
 
 // 掉落
 function dropTiles() {
   for (let x = 0; x < SIZE; x++) {
     let col = [];
-    
+
     for (let y = SIZE - 1; y >= 0; y--) {
       if (board[y][x] != null) {
         col.push(board[y][x]);
@@ -158,22 +236,10 @@ function dropTiles() {
   }
 }
 
-// 主邏輯（自動消）
-function gameLoop() {
-  let matches = findMatches();
-
-  if (matches.length > 0) {
-    removeMatches(matches);
-    dropTiles();
-  }
-
-  draw();
-}
-
 // 啟動
 img.onload = () => {
   initBoard();
-  setInterval(gameLoop, 500);
+  draw();
 };
 </script>
 
