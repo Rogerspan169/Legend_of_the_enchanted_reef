@@ -5,34 +5,19 @@
 <meta charset="UTF-8">
 <title>海洋三消遊戲</title>
 <style>
-body {
-  background: #0b2a3c;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  color: white;
-  font-family: sans-serif;
-}
-
-#ui {
-margin: 10px;
-font-size: 20px;
-}
-
-canvas {
-background: #0e3f5a;
-border: 3px solid white;
-cursor: pointer;
-} </style>
-
+  body {
+    background: #0b2a3c;
+    display: flex;
+    justify-content: center;
+    margin-top: 20px;
+  }
+  canvas {
+    background: #0e3f5a;
+    border: 3px solid white;
+  }
+</style>
 </head>
 <body>
-
-<div id="ui">
-  分數：<span id="score">0</span>　
-  Combo：<span id="combo">0</span>　
-  時間：<span id="time">60</span>
-</div>
 
 <canvas id="game" width="500" height="500"></canvas>
 
@@ -42,24 +27,40 @@ const ctx = canvas.getContext("2d");
 
 const SIZE = 10;
 const TILE = 50;
-const TYPES = 4;
 
-const img = new Image();
-img.src = "sprite_sheet.png";
+// 4種物件
+const TYPES = 5;
 
+// 載入圖片
+const images = [];
+
+const imagePaths = [
+  "https://github.com/Rogerspan169/Legend_of_the_enchanted_reef/blob/main/images/plastic_bag.png",
+  "https://github.com/Rogerspan169/Legend_of_the_enchanted_reef/blob/main/images/PET_bottle.png",
+  "https://github.com/Rogerspan169/Legend_of_the_enchanted_reef/blob/main/images/can.png",
+  "https://github.com/Rogerspan169/Legend_of_the_enchanted_reef/blob/main/images/tire.png",
+  "https://github.com/Rogerspan169/Legend_of_the_enchanted_reef/blob/main/images/glass_bottle.png"
+];
+
+// 載入全部圖片
+let loaded = 0;
+for (let i = 0; i < imagePaths.length; i++) {
+  let img = new Image();
+  img.src = imagePaths[i];
+  img.onload = () => {
+    loaded++;
+    if (loaded === imagePaths.length) {
+      initBoard();
+      draw();
+    }
+  };
+  images.push(img);
+}
+
+// 棋盤
 let board = [];
-let selected = null;
-let isAnimating = false;
 
-let score = 0;
-let combo = 0;
-let timeLeft = 60;
-let gameOver = false;
-
-// 淡出效果
-let fading = [];
-
-// 初始化
+// 初始化棋盤
 function initBoard() {
   board = [];
   for (let y = 0; y < SIZE; y++) {
@@ -71,267 +72,106 @@ function initBoard() {
   }
 }
 
+// 隨機類型
 function randomType() {
   return Math.floor(Math.random() * TYPES);
 }
 
-// 畫面
+// 畫圖
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   for (let y = 0; y < SIZE; y++) {
     for (let x = 0; x < SIZE; x++) {
       let type = board[y][x];
-      if (type != null) drawTile(type, x, y);
+      drawTile(type, x * TILE, y * TILE);
     }
-  }
-
-  // 畫淡出
-  fading.forEach(f => {
-    ctx.globalAlpha = f.alpha;
-    drawTile(f.type, f.x, f.y);
-    ctx.globalAlpha = 1;
-  });
-
-  // 選取框（粗）
-  if (selected) {
-    ctx.strokeStyle = "yellow";
-    ctx.lineWidth = 6;
-    ctx.strokeRect(
-      selected.x * TILE,
-      selected.y * TILE,
-      TILE,
-      TILE
-    );
   }
 }
 
-// 畫單格
+// 畫單個物件（來自 sprite sheet）
 function drawTile(type, x, y) {
-  const sx = (type % 2) * 256;
-  const sy = Math.floor(type / 2) * 256;
-
   ctx.drawImage(
-    img,
-    sx, sy, 256, 256,
-    x * TILE, y * TILE,
-    TILE, TILE
-  );
+  images[type],
+  x * TILE,
+  y * TILE,
+  TILE,
+  TILE
+);
 }
 
-// 點擊
-canvas.addEventListener("click", (e) => {
-  if (isAnimating || gameOver) return;
-
-  const rect = canvas.getBoundingClientRect();
-  const x = Math.floor((e.clientX - rect.left) / TILE);
-  const y = Math.floor((e.clientY - rect.top) / TILE);
-
-  if (!selected) {
-    selected = {x, y};
-  } else {
-    const dx = Math.abs(selected.x - x);
-    const dy = Math.abs(selected.y - y);
-
-    if ((dx === 1 && dy === 0) || (dx === 0 && dy === 1)) {
-      swap(selected, {x, y});
-      selected = null;
-    } else {
-      selected = {x, y};
-    }
-  }
-
-  draw();
-});
-
-// 交換
-function swap(a, b) {
-  isAnimating = true;
-  combo = 0;
-
-  let temp = board[a.y][a.x];
-  board[a.y][a.x] = board[b.y][b.x];
-  board[b.y][b.x] = temp;
-
-  setTimeout(() => {
-let matches = findMatches();
-
-if (matches.length === 0) {
-// 換回來
-let temp = board[a.y][a.x];
-board[a.y][a.x] = board[b.y][b.x];
-board[b.y][b.x] = temp;
-
-isAnimating = false; // ⭐ 保險
-draw();
-
-} else {
-resolveMatches(true);
-}
-}, 200);
-
-
-// 找消除
+// 找可消除
 function findMatches() {
-let found = {};
+  let matches = [];
 
-// 橫向
-for (let y = 0; y < SIZE; y++) {
-let count = 1;
-
-for (let x = 1; x < SIZE; x++) {
-  if (board[y][x] !== null && board[y][x] === board[y][x-1]) {
-    count++;
-  } else {
-    if (count >= 3) {
-      for (let k = 0; k < count; k++) {
-        found[(y) + "_" + (x-1-k)] = true;
+  // 橫向
+  for (let y = 0; y < SIZE; y++) {
+    let count = 1;
+    for (let x = 1; x < SIZE; x++) {
+      if (board[y][x] === board[y][x - 1]) {
+        count++;
+      } else {
+        if (count >= 3) {
+          for (let k = 0; k < count; k++) {
+            matches.push([y, x - 1 - k]);
+          }
+        }
+        count = 1;
       }
     }
-    count = 1;
-  }
-}
-
-if (count >= 3) {
-  for (let k = 0; k < count; k++) {
-    found[y + "_" + (SIZE-1-k)] = true;
-  }
-}
-
-}
-
-// 直向
-for (let x = 0; x < SIZE; x++) {
-let count = 1;
-
-for (let y = 1; y < SIZE; y++) {
-  if (board[y][x] !== null && board[y][x] === board[y-1][x]) {
-    count++;
-  } else {
     if (count >= 3) {
       for (let k = 0; k < count; k++) {
-        found[(y-1-k) + "_" + x] = true;
+        matches.push([y, SIZE - 1 - k]);
       }
     }
-    count = 1;
   }
-}
 
-if (count >= 3) {
-  for (let k = 0; k < count; k++) {
-    found[(SIZE-1-k) + "_" + x] = true;
-  }
-}
-
-}
-
-// 轉回陣列
-return Object.keys(found).map(k => {
-let [y,x] = k.split("_").map(Number);
-return [y,x];
-});
-}
-
-
-// 消除流程
-function resolveMatches(isPlayer) {
-let matches = findMatches();
-
-if (matches.length === 0) {
-// ⭐ 保證一定解鎖
-score += combo * 10;
-updateUI();
-isAnimating = false;
-return;
-}
-
-combo++;
-
-let tiles = matches.map(([y,x]) => ({
-y, x, type: board[y][x]
-}));
-
-// ⭐ 計分
-tiles.forEach(()=>{
-score += isPlayer ? 10 : 5;
-});
-
-updateUI();
-
-// ⭐ 清除 + 淡出
-tiles.forEach(t=>{
-if (board[t.y][t.x] !== null) {
-fading.push({x:t.x,y:t.y,type:t.type,alpha:1});
-board[t.y][t.x] = null;
-}
-});
-
-animateFade(()=>{
-dropTiles();
-
-// ⭐ 用 setTimeout 避免同步卡死
-setTimeout(() => {
-  resolveMatches(false);
-}, 50);
-
-});
-}
-
-
-  // 加分
-  tiles.forEach(()=>{
-    score += isPlayer ? 10 : 5;
-  });
-
-  updateUI();
-
-  // 加入淡出
-  tiles.forEach(t=>{
-    fading.push({x:t.x,y:t.y,type:t.type,alpha:1});
-    board[t.y][t.x] = null;
-  });
-
-  animateFade(()=>{
-    dropTiles();
-    resolveMatches(false);
-  });
-}
-
-// 淡出動畫
-function animateFade(callback) {
-  let duration = 300;
-  let start = performance.now();
-
-  function frame(now) {
-    let p = (now - start) / duration;
-
-    fading.forEach(f=>{
-      f.alpha = 1 - p;
-    });
-
-    draw();
-
-    if (p < 1) {
-      requestAnimationFrame(frame);
-    } else {
-      fading = [];
-      callback();
+  // 直向
+  for (let x = 0; x < SIZE; x++) {
+    let count = 1;
+    for (let y = 1; y < SIZE; y++) {
+      if (board[y][x] === board[y - 1][x]) {
+        count++;
+      } else {
+        if (count >= 3) {
+          for (let k = 0; k < count; k++) {
+            matches.push([y - 1 - k, x]);
+          }
+        }
+        count = 1;
+      }
+    }
+    if (count >= 3) {
+      for (let k = 0; k < count; k++) {
+        matches.push([SIZE - 1 - k, x]);
+      }
     }
   }
 
-  requestAnimationFrame(frame);
+  return matches;
+}
+
+// 消除
+function removeMatches(matches) {
+  for (let [y, x] of matches) {
+    board[y][x] = null;
+  }
 }
 
 // 掉落
 function dropTiles() {
   for (let x = 0; x < SIZE; x++) {
     let col = [];
-
+    
     for (let y = SIZE - 1; y >= 0; y--) {
-      if (board[y][x] != null) col.push(board[y][x]);
+      if (board[y][x] != null) {
+        col.push(board[y][x]);
+      }
     }
 
-    while (col.length < SIZE) col.push(randomType());
+    while (col.length < SIZE) {
+      col.push(randomType());
+    }
 
     for (let y = SIZE - 1; y >= 0; y--) {
       board[y][x] = col[SIZE - 1 - y];
@@ -339,30 +179,20 @@ function dropTiles() {
   }
 }
 
-// UI
-function updateUI() {
-  document.getElementById("score").innerText = score;
-  document.getElementById("combo").innerText = combo;
+// 主邏輯（自動消）
+function gameLoop() {
+  let matches = findMatches();
+
+  if (matches.length > 0) {
+    removeMatches(matches);
+    dropTiles();
+  }
+
+  draw();
 }
 
-// 倒數
-setInterval(()=>{
-  if (gameOver) return;
-
-  timeLeft--;
-  document.getElementById("time").innerText = timeLeft;
-
-  if (timeLeft <= 0) {
-    gameOver = true;
-    alert("時間到！分數：" + score);
-  }
-},1000);
-
 // 啟動
-img.onload = () => {
-  initBoard();
-  draw();
-};
+
 </script>
 
 </body>
