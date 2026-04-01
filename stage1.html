@@ -19,7 +19,7 @@
 </head>
 <body>
 
-<canvas id="game" width="500" height="500"></canvas>
+<canvas id="game" width="500" height="600"></canvas>
 
 <script>
 const canvas = document.getElementById("game");
@@ -27,171 +27,438 @@ const ctx = canvas.getContext("2d");
 
 const SIZE = 10;
 const TILE = 50;
-
-// 4種物件
 const TYPES = 5;
+const OFFSET_Y = 100;
 
-// 載入圖片
+// ===== 圖片載入 =====
 const images = [];
-
 const imagePaths = [
-  "https://github.com/Rogerspan169/Legend_of_the_enchanted_reef/blob/main/images/plastic_bag.png",
-  "https://github.com/Rogerspan169/Legend_of_the_enchanted_reef/blob/main/images/PET_bottle.png",
-  "https://github.com/Rogerspan169/Legend_of_the_enchanted_reef/blob/main/images/can.png",
-  "https://github.com/Rogerspan169/Legend_of_the_enchanted_reef/blob/main/images/tire.png",
-  "https://github.com/Rogerspan169/Legend_of_the_enchanted_reef/blob/main/images/glass_bottle.png"
+"https://raw.githubusercontent.com/Rogerspan169/Legend_of_the_enchanted_reef/main/images/plastic_bag.png",
+"https://raw.githubusercontent.com/Rogerspan169/Legend_of_the_enchanted_reef/main/images/PET_bottle.png",
+"https://raw.githubusercontent.com/Rogerspan169/Legend_of_the_enchanted_reef/main/images/can.png",
+"https://raw.githubusercontent.com/Rogerspan169/Legend_of_the_enchanted_reef/main/images/tire.png",
+"https://raw.githubusercontent.com/Rogerspan169/Legend_of_the_enchanted_reef/main/images/glass_bottle.png"
 ];
 
-// 載入全部圖片
 let loaded = 0;
 for (let i = 0; i < imagePaths.length; i++) {
-  let img = new Image();
-  img.src = imagePaths[i];
-  img.onload = () => {
-    loaded++;
-    if (loaded === imagePaths.length) {
-      initBoard();
-      draw();
-    }
-  };
-  images.push(img);
+let img = new Image();
+img.src = imagePaths[i];
+img.onload = () => {
+loaded++;
+if (loaded === imagePaths.length) {
+initBoard();
+draw();
+startTimer();
+}
+};
+images.push(img);
 }
 
-// 棋盤
+// ===== 遊戲狀態 =====
 let board = [];
+let selected = null;
+let isAnimating = false;
 
-// 初始化棋盤
+let score = 0;
+let combo = 0;
+let timeLeft = 60;
+let gameOver = false;
+
+let floatingTexts = [];
+
+// ===== 初始化 =====
 function initBoard() {
   board = [];
   for (let y = 0; y < SIZE; y++) {
     let row = [];
     for (let x = 0; x < SIZE; x++) {
-      row.push(randomType());
+      row.push(getSafeRandom(x, y, row));
     }
     board.push(row);
   }
+
+  // ⭐ 清除初始連線
+  function getSafeRandom(x, y, row) {
+  let type;
+
+  do {
+    type = randomType();
+  } while (
+    // 檢查橫向
+    (x >= 2 &&
+     row[x-1] === type &&
+     row[x-2] === type) ||
+
+    // 檢查縱向
+    (y >= 2 &&
+     board[y-1][x] === type &&
+     board[y-2][x] === type)
+  );
+
+  return type;
+}
 }
 
-// 隨機類型
 function randomType() {
-  return Math.floor(Math.random() * TYPES);
+return Math.floor(Math.random() * TYPES);
 }
 
-// 畫圖
+function addFloatingText(x, y, text) {
+  floatingTexts.push({
+    x: x,
+    y: y,
+    text: text,
+    life: .5
+  });
+}
+
+// ===== 畫面 =====
 function draw() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  for (let y = 0; y < SIZE; y++) {
-    for (let x = 0; x < SIZE; x++) {
-      let type = board[y][x];
-      drawTile(type, x * TILE, y * TILE);
-    }
-  }
+for (let y = 0; y < SIZE; y++) {
+for (let x = 0; x < SIZE; x++) {
+drawTile(board[y][x], x, y);
+}
 }
 
-// 畫單個物件（來自 sprite sheet）
+// 選取框
+if (selected) {
+ctx.strokeStyle = "yellow";
+ctx.lineWidth = 5;
+ctx.strokeRect(selected.x*TILE, selected.y*TILE + OFFSET_Y, TILE, TILE);
+}
+
+// UI
+ctx.fillStyle = "white";
+ctx.font = "18px Arial";
+ctx.fillText("分數: " + score, 100, 50);
+ctx.fillText("時間: " + timeLeft, 250, 50);
+ctx.fillText("Combo: " + combo, 400, 50);
+
+floatingTexts.forEach(ft => {
+  ctx.fillStyle = "yellow";
+  ctx.font = "20px Arial";
+  ctx.fillText(ft.text, ft.x, ft.y);
+
+  ft.y -= 1;     // 往上飄
+  ft.life--;
+});
+
+// 移除消失的文字
+floatingTexts = floatingTexts.filter(ft => ft.life > 0);
+}
+
 function drawTile(type, x, y) {
-  ctx.drawImage(
-  images[type],
-  x * TILE,
-  y * TILE,
-  TILE,
-  TILE
-);
+if (type === null) return;
+ctx.drawImage(images[type], x*TILE, y*TILE + OFFSET_Y, TILE, TILE);
 }
 
-// 找可消除
-function findMatches() {
-  let matches = [];
+// ===== 點擊交換 =====
+//if (y < 0) return;//
+canvas.addEventListener("click", (e) => {
+if (isAnimating || gameOver) return;
 
-  // 橫向
+const rect = canvas.getBoundingClientRect();
+const x = Math.floor((e.clientX - rect.left) / TILE);
+const y = Math.floor((e.clientY - rect.top - OFFSET_Y) / TILE);
+
+if (!selected) {
+selected = {x,y};
+} else {
+let dx = Math.abs(selected.x - x);
+let dy = Math.abs(selected.y - y);
+
+
+if ((dx === 1 && dy === 0) || (dx === 0 && dy === 1)) {
+  swap(selected, {x,y});
+  selected = null;
+} else {
+  selected = {x,y};
+}
+
+
+}
+
+draw();
+});
+
+// ===== 交換 =====
+function swap(a,b) {
+  isAnimating = true;
+  combo = 0;
+  turnScore = 0; // ⭐ 重置本回合分數
+  baseScore = 0;
+
+[board[a.y][a.x], board[b.y][b.x]] =
+[board[b.y][b.x], board[a.y][a.x]];
+
+setTimeout(()=>{
+let matches = findMatchGroups();
+
+if (matches.length === 0) {
+// 換回來
+[board[a.y][a.x], board[b.y][b.x]] =
+[board[b.y][b.x], board[a.y][a.x]];
+
+
+isAnimating = false; // ⭐ 保險解鎖
+draw();
+
+
+} else {
+resolveMatches(true);
+}
+},200);
+
+}
+
+// ===== 找三消 =====
+function findMatchGroups() {
+  let mark = Array.from({length: SIZE}, () => Array(SIZE).fill(false));
+  let groups = [];
+
+  // ===== 橫向 =====
   for (let y = 0; y < SIZE; y++) {
     let count = 1;
+
     for (let x = 1; x < SIZE; x++) {
-      if (board[y][x] === board[y][x - 1]) {
+      if (board[y][x] === board[y][x-1]) {
         count++;
       } else {
         if (count >= 3) {
+          let group = [];
           for (let k = 0; k < count; k++) {
-            matches.push([y, x - 1 - k]);
+            group.push([y, x-1-k]);
+            mark[y][x-1-k] = true;
           }
+          groups.push(group);
         }
         count = 1;
       }
     }
+
     if (count >= 3) {
+      let group = [];
       for (let k = 0; k < count; k++) {
-        matches.push([y, SIZE - 1 - k]);
+        group.push([y, SIZE-1-k]);
+        mark[y][SIZE-1-k] = true;
       }
+      groups.push(group);
     }
   }
 
-  // 直向
+  // ===== 縱向 =====
   for (let x = 0; x < SIZE; x++) {
     let count = 1;
+
     for (let y = 1; y < SIZE; y++) {
-      if (board[y][x] === board[y - 1][x]) {
+      if (board[y][x] === board[y-1][x]) {
         count++;
       } else {
         if (count >= 3) {
+          let group = [];
           for (let k = 0; k < count; k++) {
-            matches.push([y - 1 - k, x]);
+            group.push([y-1-k, x]);
+            mark[y-1-k][x] = true;
           }
+          groups.push(group);
         }
         count = 1;
       }
     }
+
     if (count >= 3) {
+      let group = [];
       for (let k = 0; k < count; k++) {
-        matches.push([SIZE - 1 - k, x]);
+        group.push([SIZE-1-k, x]);
+        mark[SIZE-1-k][x] = true;
       }
+      groups.push(group);
     }
   }
 
-  return matches;
+  return groups;
 }
 
-// 消除
-function removeMatches(matches) {
-  for (let [y, x] of matches) {
+function mergeGroups(groups) {
+  let merged = [];
+
+  groups.forEach(group => {
+    let added = false;
+
+    for (let m of merged) {
+      // 檢查是否有交集
+      if (group.some(([y,x]) =>
+          m.some(([y2,x2]) => y===y2 && x===x2)
+      )) {
+        m.push(...group);
+        added = true;
+        break;
+      }
+    }
+
+    if (!added) {
+      merged.push([...group]);
+    }
+  });
+
+  // 去重複
+  return merged.map(group => {
+    let set = new Set(group.map(([y,x])=>y+"_"+x));
+    return Array.from(set).map(s=>{
+      let [y,x]=s.split("_").map(Number);
+      return [y,x];
+    });
+  });
+}
+
+// ===== 判定群組分數 =====
+function getGroupScore(group){
+  let ys = group.map(p=>p[0]);
+  let xs = group.map(p=>p[1]);
+
+  let uniqueY = new Set(ys).size;
+  let uniqueX = new Set(xs).size;
+
+  let size = group.length;
+
+  let turnScore = 0;
+  let baseScore = 0; // ⭐ 累積基礎分
+
+  // 五連直/橫
+  if (size >= 5 && (uniqueX === 1 || uniqueY === 1)) return 35;
+
+  // 四連直/橫
+  if (size === 4 && (uniqueX === 1 || uniqueY === 1)) return 20;
+
+  // T / L / 十字形：總數 >=4 且直橫至少各 2
+  if (size >= 4 && uniqueX >= 2 && uniqueY >= 2) return 25;
+
+  // 三消直/橫
+  if (size === 3 && (uniqueX === 1 || uniqueY === 1)) return 10;
+
+  // 其他情況不消
+  return 0;
+}
+
+// ===== 消除 =====
+// ===== 消除群組 =====
+function resolveMatches(isPlayer){
+  let groups = mergeGroups(findMatchGroups());
+
+  if(groups.length === 0){
+    isAnimating = false;
+    combo = 0;
+    return;
+  }
+
+  let group = groups[0];
+
+  combo++;
+
+  let removed = new Set();
+  let cellCount = {};
+
+  group.forEach(([y,x])=>{
+    let key = y + "_" + x;
+    cellCount[key] = (cellCount[key] || 0) + 1;
+  });
+
+  let isSpecial = false;
+  group.forEach(([y,x])=>{
+    if (cellCount[y + "_" + x] >= 2) {
+      isSpecial = true;
+    }
+  });
+
+  let base;
+  if (isSpecial) base = 25;
+  else if (group.length >= 5) base = 35;
+  else if (group.length === 4) base = 20;
+  else base = 10;
+
+  // ⭐ 正確加分
+  let multiplier = combo >= 2 ? combo : 1;
+  let gained = base * multiplier;
+  score += gained;
+
+  // ⭐ 浮動文字
+  let avgX = 0, avgY = 0;
+  group.forEach(([y,x])=>{
+    avgX += x;
+    avgY += y;
+  });
+  avgX /= group.length;
+  avgY /= group.length;
+
+  addFloatingText(
+    avgX * TILE,
+    avgY * TILE + OFFSET_Y,
+    "+" + gained
+  );
+
+  group.forEach(([y,x])=>{
+    removed.add(y + "_" + x);
+  });
+
+  removed.forEach(key=>{
+    let [y,x] = key.split("_").map(Number);
     board[y][x] = null;
-  }
-}
+  });
 
-// 掉落
-function dropTiles() {
-  for (let x = 0; x < SIZE; x++) {
-    let col = [];
-    
-    for (let y = SIZE - 1; y >= 0; y--) {
-      if (board[y][x] != null) {
-        col.push(board[y][x]);
-      }
-    }
-
-    while (col.length < SIZE) {
-      col.push(randomType());
-    }
-
-    for (let y = SIZE - 1; y >= 0; y--) {
-      board[y][x] = col[SIZE - 1 - y];
-    }
-  }
-}
-
-// 主邏輯（自動消）
-function gameLoop() {
-  let matches = findMatches();
-
-  if (matches.length > 0) {
-    removeMatches(matches);
+  setTimeout(()=>{
     dropTiles();
-  }
 
-  draw();
+    setTimeout(()=>{
+      resolveMatches(false);
+    },200);
+
+  },200);
 }
 
-// 啟動
+// ===== 掉落 =====
+function dropTiles(){
+for(let x=0;x<SIZE;x++){
+let col=[];
+for(let y=SIZE-1;y>=0;y--){
+if(board[y][x]!=null) col.push(board[y][x]);
+}
+while(col.length<SIZE) col.push(randomType());
+
+
+for(let y=SIZE-1;y>=0;y--){
+  board[y][x]=col[SIZE-1-y];
+}
+
+
+}
+}
+
+function gameLoop(){
+  draw();
+  requestAnimationFrame(gameLoop);
+}
+gameLoop();
+
+// ===== 計時 =====
+function startTimer(){
+let timer = setInterval(()=>{
+if(gameOver) return;
+
+timeLeft--;
+draw();
+
+if(timeLeft<=0){
+  gameOver=true;
+  clearInterval(timer);
+  alert("時間到！分數："+score);
+}
+
+
+},1000);
+}
 
 </script>
 
