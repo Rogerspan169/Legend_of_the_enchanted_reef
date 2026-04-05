@@ -70,6 +70,8 @@ let gameOver = false;
 
 let floatingTexts = [];
 
+//addFloatingText(cx*TILE, cy*TILE + OFFSET_Y, "+" + base);
+
 // ===== 初始化 =====
 function initBoard() {
   board = [];
@@ -122,6 +124,7 @@ function draw() {
   }
 
   ctx.fillStyle = "white";
+  ctx.font = "20px Arial";
   ctx.fillText("分數: " + score, 100, 50);
   ctx.fillText("時間: " + timeLeft, 250, 50);
   ctx.fillText("Combo: " + combo, 400, 50);
@@ -244,7 +247,7 @@ function findMatchGroups() {
 
 // ===== 消除 =====
 function resolveMatches(){
-  let groups = findMatchGroups();
+  let groups = mergeGroups(findMatchGroups());
 
   if(groups.length === 0){
     if(comboCount >= 2){
@@ -276,9 +279,10 @@ function resolveMatches(){
   else if(group.length >= 5 && (uniqueX === 1 || uniqueY === 1)){
     base = 35; specialType = "line5";
   }
-  else if(group.length === 4){
-    base = 20; specialType = "line4";
-  }
+  else if(group.length === 4 && (uniqueX === 1 || uniqueY === 1)){
+  base = 20;
+  specialType = "line4";
+}
   else if(group.length === 3){
     base = 10;
   }
@@ -288,6 +292,9 @@ function resolveMatches(){
   let center = group[Math.floor(group.length / 2)];
   let [cy, cx] = center;
   let originalType = board[cy][cx].type;
+
+  // ⭐ 加在這裡
+addFloatingText(cx*TILE, cy*TILE + OFFSET_Y, "+" + base);
 
   group.forEach(([y,x])=>{
     if (y === cy && x === cx) return;
@@ -301,9 +308,42 @@ function resolveMatches(){
   }
 
   setTimeout(()=>{
-    dropTiles();
-    setTimeout(resolveMatches,200);
+  dropTiles();
+  draw();
+
+  setTimeout(()=>{
+    requestAnimationFrame(resolveMatches); // ⭐讓出主執行緒
   },200);
+
+},200);
+}
+
+function mergeGroups(groups) {
+  let merged = [];
+
+  groups.forEach(group => {
+    let added = false;
+
+    for (let m of merged) {
+      if (group.some(([y,x]) =>
+          m.some(([y2,x2]) => y===y2 && x===x2)
+      )) {
+        m.push(...group);
+        added = true;
+        break;
+      }
+    }
+
+    if (!added) merged.push([...group]);
+  });
+
+  return merged.map(group => {
+    let set = new Set(group.map(([y,x])=>y+"_"+x));
+    return Array.from(set).map(s=>{
+      let [y,x]=s.split("_").map(Number);
+      return [y,x];
+    });
+  });
 }
 
 // ===== 掉落 =====
