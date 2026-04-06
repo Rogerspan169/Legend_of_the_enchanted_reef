@@ -2,18 +2,18 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
-<title>海洋三消遊戲</title>
+<title>海洋三消（完整版）</title>
 <style>
-  body {
-    background: #0b2a3c;
-    display: flex;
-    justify-content: center;
-    margin-top: 20px;
-  }
-  canvas {
-    background: #0e3f5a;
-    border: 3px solid white;
-  }
+body {
+  background: #0b2a3c;
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+}
+canvas {
+  background: #0e3f5a;
+  border: 3px solid white;
+}
 </style>
 </head>
 <body>
@@ -50,7 +50,7 @@ for (let i = 0; i < imagePaths.length; i++) {
     loaded++;
     if (loaded === imagePaths.length) {
       initBoard();
-      draw();
+      gameLoop();
       startTimer();
     }
   };
@@ -68,277 +68,236 @@ let comboCount = 0;
 let timeLeft = 60;
 let gameOver = false;
 
-let floatingTexts = [];
-
-//addFloatingText(cx*TILE, cy*TILE + OFFSET_Y, "+" + base);
-
 // ===== 初始化 =====
-function initBoard() {
-  board = [];
-  for (let y = 0; y < SIZE; y++) {
-    let row = [];
-    for (let x = 0; x < SIZE; x++) {
-      row.push(getSafeRandom(x, y, row));
+
+function hasPossibleMoves(){
+
+  for(let y=0;y<SIZE;y++){
+    for(let x=0;x<SIZE;x++){
+
+      let dirs = [
+        [1,0],
+        [0,1]
+      ];
+
+      for(let [dx,dy] of dirs){
+
+        let nx = x + dx;
+        let ny = y + dy;
+
+        if(nx>=SIZE || ny>=SIZE) continue;
+
+        // 模擬交換
+        [board[y][x], board[ny][nx]] =
+        [board[ny][nx], board[y][x]];
+
+        let matches = findMatches();
+
+        // 換回來
+        [board[y][x], board[ny][nx]] =
+        [board[ny][nx], board[y][x]];
+
+        if(matches.length > 0){
+          return true;
+        }
+      }
     }
-    board.push(row);
   }
 
-  function getSafeRandom(x, y, row) {
-    let type;
-    do {
-      type = Math.floor(Math.random() * TYPES);
-    } while (
-      (x >= 2 &&
-       row[x-1].type === type &&
-       row[x-2].type === type) ||
-      (y >= 2 &&
-       board[y-1][x].type === type &&
-       board[y-2][x].type === type)
-    );
+  return false;
+}
 
-    return { type: type, special: null };
+function shuffleBoard(){
+
+  let tiles = [];
+
+  // 抽出所有 tile
+  for(let y=0;y<SIZE;y++){
+    for(let x=0;x<SIZE;x++){
+      tiles.push(board[y][x]);
+    }
+  }
+
+  // 洗牌
+  for(let i=tiles.length-1;i>0;i--){
+    let j = Math.floor(Math.random()*(i+1));
+    [tiles[i], tiles[j]] = [tiles[j], tiles[i]];
+  }
+
+  // 塞回去
+  let index = 0;
+  for(let y=0;y<SIZE;y++){
+    for(let x=0;x<SIZE;x++){
+      board[y][x] = tiles[index++];
+    }
   }
 }
 
-function randomTile() {
+function ensurePlayable(){
+
+  while(true){
+
+    if(findMatches().length === 0 && hasPossibleMoves()){
+      return;
+    }
+
+    shuffleBoard();
+  }
+}
+
+function initBoard(){
+  board = [];
+
+  for(let y=0;y<SIZE;y++){
+    let row=[];
+
+    for(let x=0;x<SIZE;x++){
+      row.push(getSafeTile(x,y,row));
+    }
+
+    board.push(row);
+  }
+  ensurePlayable(); // ⭐ 加這行
+}
+
+function getSafeTile(x,y,row){
+
+  let type;
+
+  do{
+    type = Math.floor(Math.random()*TYPES);
+
+  }while(
+    // 檢查橫向
+    (x>=2 &&
+     row[x-1].type === type &&
+     row[x-2].type === type)
+
+    ||
+
+    // 檢查縱向
+    (y>=2 &&
+     board[y-1][x].type === type &&
+     board[y-2][x].type === type)
+  );
+
   return {
-    type: Math.floor(Math.random() * TYPES),
+    type: type,
+    special: null
+  };
+}
+
+function randomTile(){
+  return {
+    type: Math.floor(Math.random()*TYPES),
     special: null
   };
 }
 
 // ===== 畫面 =====
-function draw() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
 
-  for (let y = 0; y < SIZE; y++) {
-    for (let x = 0; x < SIZE; x++) {
-      drawTile(board[y][x], x, y);
+  for(let y=0;y<SIZE;y++){
+    for(let x=0;x<SIZE;x++){
+      drawTile(board[y][x],x,y);
     }
   }
 
-  if (selected) {
-    ctx.strokeStyle = "yellow";
-    ctx.lineWidth = 5;
-    ctx.strokeRect(selected.x*TILE, selected.y*TILE + OFFSET_Y, TILE, TILE);
+  if(selected){
+    ctx.strokeStyle="yellow";
+    ctx.lineWidth=4;
+    ctx.strokeRect(selected.x*TILE, selected.y*TILE+OFFSET_Y, TILE, TILE);
   }
 
-  ctx.fillStyle = "white";
-  ctx.font = "20px Arial";
-  ctx.fillText("分數: " + score, 100, 50);
-  ctx.fillText("時間: " + timeLeft, 250, 50);
-  ctx.fillText("Combo: " + combo, 400, 50);
-
-  floatingTexts.forEach(ft => {
-    ctx.fillStyle = "yellow";
-    ctx.fillText(ft.text, ft.x, ft.y);
-    ft.y -= 1;
-    ft.life--;
-  });
-
-  floatingTexts = floatingTexts.filter(ft => ft.life > 0);
+  ctx.fillStyle="white";
+  ctx.font="18px Arial";
+  ctx.fillText("分數:"+score,100,50);
+  ctx.fillText("時間:"+timeLeft,250,50);
+  ctx.fillText("Combo:"+combo,380,50);
 }
 
-function drawTile(tile, x, y) {
-  if (!tile) return;
+function drawTile(tile,x,y){
+  if(!tile) return;
 
   let img;
-  if (tile.special === "line4") img = images[5];
-  else if (tile.special === "T") img = images[6];
-  else if (tile.special === "line5") img = images[7];
-  else img = images[tile.type];
+  if(tile.special==="line4") img=images[5];
+  else if(tile.special==="T") img=images[6];
+  else if(tile.special==="line5") img=images[7];
+  else img=images[tile.type];
 
-  ctx.drawImage(img, x*TILE, y*TILE + OFFSET_Y, TILE, TILE);
+  ctx.drawImage(img,x*TILE,y*TILE+OFFSET_Y,TILE,TILE);
 }
 
 // ===== 點擊 =====
-canvas.addEventListener("click", (e) => {
-  if (isAnimating || gameOver) return;
+canvas.addEventListener("click",(e)=>{
+  if(isAnimating||gameOver) return;
 
-  const rect = canvas.getBoundingClientRect();
-  const x = Math.floor((e.clientX - rect.left) / TILE);
-  const y = Math.floor((e.clientY - rect.top - OFFSET_Y) / TILE);
+  const rect=canvas.getBoundingClientRect();
+  const x=Math.floor((e.clientX-rect.left)/TILE);
+  const y=Math.floor((e.clientY-rect.top-OFFSET_Y)/TILE);
 
-  if (!selected) {
-    selected = {x,y};
-  } else {
-    let dx = Math.abs(selected.x - x);
-    let dy = Math.abs(selected.y - y);
+  if(!selected){
+    selected={x,y};
+  }else{
+    let dx=Math.abs(selected.x-x);
+    let dy=Math.abs(selected.y-y);
 
-    if ((dx === 1 && dy === 0) || (dx === 0 && dy === 1)) {
-      swap(selected, {x,y});
-      selected = null;
-    } else {
-      selected = {x,y};
+    if((dx===1&&dy===0)||(dx===0&&dy===1)){
+      swap(selected,{x,y});
+      selected=null;
+    }else{
+      selected={x,y};
     }
   }
-  draw();
 });
 
 // ===== 交換 =====
-function swap(a,b) {
-  isAnimating = true;
-  combo = 0;
-  comboCount = 0;
+function swap(a,b){
+  isAnimating=true;
+  combo=0;
+  comboCount=0;
 
-  [board[a.y][a.x], board[b.y][b.x]] =
-  [board[b.y][b.x], board[a.y][a.x]];
-
-  setTimeout(()=>{
-    let matches = findMatchGroups();
-
-    if (matches.length === 0) {
-      [board[a.y][a.x], board[b.y][b.x]] =
-      [board[b.y][b.x], board[a.y][a.x]];
-      isAnimating = false;
-      draw();
-    } else {
-      resolveMatches();
-    }
-  },200);
-}
-
-// ===== 找三消 =====
-function findMatchGroups() {
-  let groups = [];
-
-  for (let y = 0; y < SIZE; y++) {
-    let count = 1;
-    for (let x = 1; x < SIZE; x++) {
-      if (board[y][x].type === board[y][x-1].type) count++;
-      else {
-        if (count >= 3) {
-          let g = [];
-          for (let k = 0; k < count; k++) g.push([y, x-1-k]);
-          groups.push(g);
-        }
-        count = 1;
-      }
-    }
-    if (count >= 3) {
-      let g = [];
-      for (let k = 0; k < count; k++) g.push([y, SIZE-1-k]);
-      groups.push(g);
-    }
-  }
-
-  for (let x = 0; x < SIZE; x++) {
-    let count = 1;
-    for (let y = 1; y < SIZE; y++) {
-      if (board[y][x].type === board[y-1][x].type) count++;
-      else {
-        if (count >= 3) {
-          let g = [];
-          for (let k = 0; k < count; k++) g.push([y-1-k, x]);
-          groups.push(g);
-        }
-        count = 1;
-      }
-    }
-    if (count >= 3) {
-      let g = [];
-      for (let k = 0; k < count; k++) g.push([SIZE-1-k, x]);
-      groups.push(g);
-    }
-  }
-
-  return groups;
-}
-
-// ===== 消除 =====
-function resolveMatches(){
-  let groups = mergeGroups(findMatchGroups());
-
-  if(groups.length === 0){
-    if(comboCount >= 2){
-      score += comboCount * 10;
-    }
-    isAnimating = false;
-    combo = 0;
-    comboCount = 0;
-    return;
-  }
-
-  let group = groups[0];
-
-  combo++;
-  comboCount++;
-
-  let ys = group.map(p=>p[0]);
-  let xs = group.map(p=>p[1]);
-
-  let uniqueY = new Set(ys).size;
-  let uniqueX = new Set(xs).size;
-
-  let base = 0;
-  let specialType = null;
-
-  if(group.length >= 4 && uniqueX >= 2 && uniqueY >= 2){
-    base = 25; specialType = "T";
-  }
-  else if(group.length >= 5 && (uniqueX === 1 || uniqueY === 1)){
-    base = 35; specialType = "line5";
-  }
-  else if(group.length === 4 && (uniqueX === 1 || uniqueY === 1)){
-  base = 20;
-  specialType = "line4";
-}
-  else if(group.length === 3){
-    base = 10;
-  }
-
-  score += base;
-
-  let center = group[Math.floor(group.length / 2)];
-  let [cy, cx] = center;
-  let originalType = board[cy][cx].type;
-
-  // ⭐ 加在這裡
-addFloatingText(cx*TILE, cy*TILE + OFFSET_Y, "+" + base);
-
-  group.forEach(([y,x])=>{
-    if (y === cy && x === cx) return;
-    board[y][x] = null;
-  });
-
-  if (specialType){
-    board[cy][cx] = { type: originalType, special: specialType };
-  } else {
-    board[cy][cx] = null;
-  }
+  [board[a.y][a.x],board[b.y][b.x]]=
+  [board[b.y][b.x],board[a.y][a.x]];
 
   setTimeout(()=>{
-  dropTiles();
-  draw();
+    let matches=findMatches();
 
-  setTimeout(()=>{
-    requestAnimationFrame(resolveMatches); // ⭐讓出主執行緒
-  },200);
-
-},200);
+    if(matches.length===0){
+      [board[a.y][a.x],board[b.y][b.x]]=
+      [board[b.y][b.x],board[a.y][a.x]];
+      isAnimating=false;
+    }else{
+      resolveLoop();
+    }
+  },150);
 }
 
-function mergeGroups(groups) {
-  let merged = [];
+function mergeGroups(groups){
+  let merged=[];
 
-  groups.forEach(group => {
-    let added = false;
+  groups.forEach(group=>{
+    let added=false;
 
-    for (let m of merged) {
-      if (group.some(([y,x]) =>
-          m.some(([y2,x2]) => y===y2 && x===x2)
-      )) {
+    for(let m of merged){
+      if(group.some(([y,x]) =>
+        m.some(([y2,x2]) => y===y2 && x===x2)
+      )){
         m.push(...group);
-        added = true;
+        added=true;
         break;
       }
     }
 
-    if (!added) merged.push([...group]);
+    if(!added){
+      merged.push([...group]);
+    }
   });
 
-  return merged.map(group => {
-    let set = new Set(group.map(([y,x])=>y+"_"+x));
+  // 去重
+  return merged.map(group=>{
+    let set=new Set(group.map(([y,x])=>y+"_"+x));
     return Array.from(set).map(s=>{
       let [y,x]=s.split("_").map(Number);
       return [y,x];
@@ -346,12 +305,142 @@ function mergeGroups(groups) {
   });
 }
 
+// ===== 找三消（安全版）=====
+function findMatches(){
+  let groups=[];
+
+  // 橫
+  for(let y=0;y<SIZE;y++){
+    let count=1;
+    for(let x=1;x<SIZE;x++){
+      if(!board[y][x]||!board[y][x-1]){
+        count=1; continue;
+      }
+
+      if(board[y][x].type===board[y][x-1].type){
+        count++;
+      }else{
+        if(count>=3){
+          let g=[];
+          for(let k=0;k<count;k++) g.push([y,x-1-k]);
+          groups.push(g);
+        }
+        count=1;
+      }
+    }
+    if(count>=3){
+      let g=[];
+      for(let k=0;k<count;k++) g.push([y,SIZE-1-k]);
+      groups.push(g);
+    }
+  }
+
+  // 直
+  for(let x=0;x<SIZE;x++){
+    let count=1;
+    for(let y=1;y<SIZE;y++){
+      if(!board[y][x]||!board[y-1][x]){
+        count=1; continue;
+      }
+
+      if(board[y][x].type===board[y-1][x].type){
+        count++;
+      }else{
+        if(count>=3){
+          let g=[];
+          for(let k=0;k<count;k++) g.push([y-1-k,x]);
+          groups.push(g);
+        }
+        count=1;
+      }
+    }
+    if(count>=3){
+      let g=[];
+      for(let k=0;k<count;k++) g.push([SIZE-1-k,x]);
+      groups.push(g);
+    }
+  }
+
+  return groups;
+}
+
+// ===== 核心連鎖流程 =====
+function resolveLoop(){
+
+  let groups=mergeGroups(findMatches());
+
+  if(groups.length===0){
+    if(comboCount>=2){
+      score+=comboCount*10;
+    }
+
+    ensurePlayable(); // ⭐ 防死局
+
+    isAnimating=false;
+    combo=0;
+    comboCount=0;
+    return;
+  }
+
+  let group=groups[0];
+
+  combo++;
+  comboCount++;
+
+  let ys=group.map(p=>p[0]);
+  let xs=group.map(p=>p[1]);
+
+  let uniqueY=new Set(ys).size;
+  let uniqueX=new Set(xs).size;
+
+  let base=0;
+  let special=null;
+
+  if(group.length>=4&&uniqueX>=2&&uniqueY>=2){
+    base=25; special="T";
+  }
+  else if(group.length>=5&&(uniqueX===1||uniqueY===1)){
+    base=35; special="line5";
+  }
+  else if(group.length===4){
+    base=20; special="line4";
+  }
+  else{
+    base=10;
+  }
+
+  score+=base;
+
+  let [cy,cx]=group[Math.floor(group.length/2)];
+  let original=board[cy][cx]?.type;
+
+  group.forEach(([y,x])=>{
+    if(y===cy&&x===cx) return;
+    board[y][x]=null;
+  });
+
+  if(special){
+    board[cy][cx]={type:original,special};
+  }else{
+    board[cy][cx]=null;
+  }
+
+  draw();
+
+  setTimeout(()=>{
+    dropTiles();
+    draw();
+
+    setTimeout(resolveLoop,150);
+  },150);
+}
+
 // ===== 掉落 =====
 function dropTiles(){
   for(let x=0;x<SIZE;x++){
     let col=[];
     for(let y=SIZE-1;y>=0;y--){
-      if(board[y][x]!=null) col.push(board[y][x]);
+      if(board[y][x]) col.push(board[y][x]);
     }
     while(col.length<SIZE) col.push(randomTile());
 
@@ -361,26 +450,26 @@ function dropTiles(){
   }
 }
 
-// ===== Loop =====
+// ===== LOOP =====
 function gameLoop(){
   draw();
   requestAnimationFrame(gameLoop);
 }
-gameLoop();
 
 // ===== 計時 =====
 function startTimer(){
-  let timer = setInterval(()=>{
+  setInterval(()=>{
     if(gameOver) return;
+
     timeLeft--;
 
     if(timeLeft<=0){
       gameOver=true;
-      clearInterval(timer);
-      alert("時間到！分數："+score);
+      alert("時間到！分數:"+score);
     }
   },1000);
 }
 </script>
+
 </body>
 </html>
