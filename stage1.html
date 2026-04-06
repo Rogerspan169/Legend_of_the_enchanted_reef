@@ -68,6 +68,10 @@ let comboCount = 0;
 let timeLeft = 60;
 let gameOver = false;
 
+let floatingTexts = [];
+
+let lastSwap = null;
+
 // ===== 初始化 =====
 
 function hasPossibleMoves(){
@@ -187,6 +191,16 @@ function getSafeTile(x,y,row){
   };
 }
 
+function addFloatingText(x, y, text){
+  floatingTexts.push({
+    x: x,
+    y: y,
+    text: text,
+    life: 60,        // 幀數（約1秒）
+    vy: -0.5         // 往上速度
+  });
+}
+
 function randomTile(){
   return {
     type: Math.floor(Math.random()*TYPES),
@@ -215,6 +229,19 @@ function draw(){
   ctx.fillText("分數:"+score,100,50);
   ctx.fillText("時間:"+timeLeft,250,50);
   ctx.fillText("Combo:"+combo,380,50);
+
+  // ===== 浮動文字 =====
+floatingTexts.forEach(ft=>{
+  ctx.fillStyle = ft.text.includes("COMBO") ? "orange" : "yellow";
+  ctx.font = "20px Arial";
+  ctx.fillText(ft.text, ft.x, ft.y);
+
+  ft.y += ft.vy;
+  ft.life--;
+});
+
+// 移除消失的
+floatingTexts = floatingTexts.filter(ft => ft.life > 0);
 }
 
 function drawTile(tile,x,y){
@@ -258,7 +285,9 @@ function swap(a,b){
   combo=0;
   comboCount=0;
 
-  [board[a.y][a.x],board[b.y][b.x]]=
+  lastSwap = [a, b]; // ⭐ 記錄
+
+  [board[a.y][a.x],board[b.y][b.x]] =
   [board[b.y][b.x],board[a.y][a.x]];
 
   setTimeout(()=>{
@@ -370,9 +399,13 @@ function resolveLoop(){
   let groups=mergeGroups(findMatches());
 
   if(groups.length===0){
+    lastSwap = null;
     if(comboCount>=2){
-      score+=comboCount*10;
-    }
+  let bonus = comboCount*10;
+  score += bonus;
+
+  addFloatingText(200, 80, "COMBO +" + bonus);
+}
 
     ensurePlayable(); // ⭐ 防死局
 
@@ -396,22 +429,71 @@ function resolveLoop(){
   let base=0;
   let special=null;
 
-  if(group.length>=4&&uniqueX>=2&&uniqueY>=2){
-    base=25; special="T";
-  }
-  else if(group.length>=5&&(uniqueX===1||uniqueY===1)){
-    base=35; special="line5";
-  }
-  else if(group.length===4){
-    base=20; special="line4";
-  }
-  else{
-    base=10;
-  }
+  // ⭐ 先判「純直線」
+if(group.length>=5 && (uniqueX===1 || uniqueY===1)){
+  base=35;
+  special="line5";
+}
+else if(group.length===4 && (uniqueX===1 || uniqueY===1)){
+  base=20;
+  special="line4";
+}
+
+// ⭐ 再判「T / L / 十字」
+else if(group.length>=4 && uniqueX>=2 && uniqueY>=2){
+  base=25;
+  special="T";
+}
+
+// ⭐ 最後才是普通三消
+else{
+  base=10;
+}
 
   score+=base;
 
-  let [cy,cx]=group[Math.floor(group.length/2)];
+  let avgX = 0;
+let avgY = 0;
+
+group.forEach(([y,x])=>{
+  avgX += x;
+  avgY += y;
+});
+
+avgX /= group.length;
+avgY /= group.length;
+
+addFloatingText(
+  avgX * TILE,
+  avgY * TILE + OFFSET_Y,
+  "+" + base
+);
+
+  let cy, cx;
+
+// ⭐ 優先用玩家交換位置
+if(lastSwap){
+  let [a,b] = lastSwap;
+
+  if(group.some(([y,x])=>y===a.y && x===a.x)){
+    cy = a.y;
+    cx = a.x;
+  }
+  else if(group.some(([y,x])=>y===b.y && x===b.x)){
+    cy = b.y;
+    cx = b.x;
+  }
+  else{
+    // fallback（連鎖時用）
+    let center = group[Math.floor(group.length/2)];
+    cy = center[0];
+    cx = center[1];
+  }
+}else{
+  let center = group[Math.floor(group.length/2)];
+  cy = center[0];
+  cx = center[1];
+}
   let original=board[cy][cx]?.type;
 
   group.forEach(([y,x])=>{
