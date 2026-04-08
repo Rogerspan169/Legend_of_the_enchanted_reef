@@ -76,6 +76,12 @@ let timeUp = false;
 
 let justCreatedSpecial = null;
 
+let pendingSkill = null;
+
+let pendingExplosion = null;
+
+let pendingJake = null;
+
 // ===== 初始化 =====
 
 function hasPossibleMoves(){
@@ -246,6 +252,26 @@ floatingTexts.forEach(ft=>{
 
 // 移除消失的
 floatingTexts = floatingTexts.filter(ft => ft.life > 0);
+
+if(pendingSkill){
+  ctx.strokeStyle = "red";
+  ctx.lineWidth = 4;
+  ctx.strokeRect(
+    pendingSkill.x*TILE,
+    pendingSkill.y*TILE+OFFSET_Y,
+    TILE,TILE
+  );
+}
+
+if(pendingJake){
+  ctx.strokeStyle = "black";
+  ctx.lineWidth = 4;
+  ctx.strokeRect(
+    pendingJake.x*TILE,
+    pendingJake.y*TILE+OFFSET_Y,
+    TILE,TILE
+  );
+}
 }
 
 function drawTile(tile,x,y){
@@ -268,6 +294,54 @@ canvas.addEventListener("click",(e)=>{
   const x=Math.floor((e.clientX-rect.left)/TILE);
   const y=Math.floor((e.clientY-rect.top-OFFSET_Y)/TILE);
 
+  const tile = board[y]?.[x];
+  if(!tile) return;
+
+  // ===== ⭐ 如果正在等技能觸發 =====
+  if(pendingSkill){
+    handleSkillTrigger(x,y);
+    return;
+  }
+
+if(pendingJake){
+  handleJakeTrigger(x,y);
+  return;
+}
+
+  // ===== ⭐ 點到 Shorty → 進入技能模式 =====
+  if(tile.special === "line4"){
+    pendingSkill = {x,y};
+    selected = null;
+    return;
+  }
+
+// ===== 點到 Indigo =====
+if(tile.special === "T"){
+
+  // 第二次點同一顆 → 觸發
+  if(selected &&
+     selected.x === x &&
+     selected.y === y){
+
+    triggerIndigo(x,y);
+    selected = null;
+    return;
+  }
+
+  // 第一次點 → 當普通選取
+  selected = {x,y};
+  return;
+}
+
+// ===== 點到 Jake =====
+if(tile.special === "line5"){
+
+  pendingJake = {x,y};
+  selected = null;
+  return;
+}
+
+  // ===== 原本交換邏輯 =====
   if(!selected){
     selected={x,y};
   }else{
@@ -282,6 +356,160 @@ canvas.addEventListener("click",(e)=>{
     }
   }
 });
+
+function handleSkillTrigger(x,y){
+
+  const {x:sx, y:sy} = pendingSkill;
+
+  // ===== 不同行列 → 取消 =====
+  if(x !== sx && y !== sy){
+    pendingSkill = null;
+    return;
+  }
+
+  isAnimating = true;
+
+  // ===== 決定清行 or 清列 =====
+  let cleared = [];
+
+  if(y === sy){
+    // 同一行
+    for(let i=0;i<SIZE;i++){
+      cleared.push([sy, i]);
+    }
+  }else{
+    // 同一列
+    for(let i=0;i<SIZE;i++){
+      cleared.push([i, sx]);
+    }
+  }
+
+  // ===== 消除 =====
+  cleared.forEach(([yy,xx])=>{
+    board[yy][xx] = null;
+  });
+
+  // ===== 移除 Shorty 本身 =====
+  board[sy][sx] = null;
+
+  // ===== 分數（你可以調整）=====
+  let gain = (cleared.length - 1) * 5;
+  score += gain;
+
+  addFloatingText(
+    sx*TILE,
+    sy*TILE+OFFSET_Y,
+    "LINE +" + gain
+  );
+
+  pendingSkill = null;
+
+  setTimeout(()=>{
+    dropTiles();
+    setTimeout(resolveLoop,150);
+  },150);
+}
+
+function triggerIndigo(x,y){
+
+  isAnimating = true;
+
+  // ⭐ 記錄位置（之後第二次用）
+  pendingExplosion = {x,y, step:1};
+
+  explode3x3(x,y);
+
+  setTimeout(()=>{
+    dropTiles();
+    setTimeout(resolveLoop,150);
+  },150);
+}
+
+function explode3x3(cx,cy){
+
+  let cleared = [];
+
+  for(let dy=-1;dy<=1;dy++){
+    for(let dx=-1;dx<=1;dx++){
+
+      let x = cx + dx;
+      let y = cy + dy;
+
+      if(x<0||x>=SIZE||y<0||y>=SIZE) continue;
+
+      cleared.push([y,x]);
+    }
+  }
+
+  cleared.forEach(([y,x])=>{
+    board[y][x] = null;
+  });
+
+  let gain = (cleared.length - 1) * 5;
+  score += gain;
+
+  addFloatingText(
+    cx*TILE,
+    cy*TILE+OFFSET_Y,
+    "BOOM +" + gain
+  );
+}
+
+function handleJakeTrigger(x,y){
+
+  const {x:sx, y:sy} = pendingJake;
+
+  const target = board[y]?.[x];
+
+  // 只能點普通方塊
+  if(!target || target.special){
+    pendingJake = null;
+    return;
+  }
+
+  isAnimating = true;
+
+  const targetType = target.type;
+
+  let cleared = [];
+
+  // ===== 找全盤同色 =====
+  for(let yy=0; yy<SIZE; yy++){
+    for(let xx=0; xx<SIZE; xx++){
+
+      if(board[yy][xx] &&
+         board[yy][xx].type === targetType){
+
+        cleared.push([yy,xx]);
+      }
+    }
+  }
+
+  // ===== 清除 =====
+  cleared.forEach(([yy,xx])=>{
+    board[yy][xx] = null;
+  });
+
+  // ===== 移除 Jake 本身 =====
+  board[sy][sx] = null;
+
+  // ===== 分數（可以調整）=====
+  let gain = cleared.length * 10;
+  score += gain;
+
+  addFloatingText(
+    sx*TILE,
+    sy*TILE+OFFSET_Y,
+    "COLOR +" + gain
+  );
+
+  pendingJake = null;
+
+  setTimeout(()=>{
+    dropTiles();
+    setTimeout(resolveLoop,150);
+  },150);
+}
 
 // ===== 交換 =====
 function swap(a,b){
@@ -361,7 +589,13 @@ if(isJustCreated(y,x) || isJustCreated(y,x-1)){
   continue;
 }
 
-      if(board[y][x].type===board[y][x-1].type){
+      if(
+  board[y][x] &&
+  board[y][x-1] &&
+  !board[y][x].special &&
+  !board[y][x-1].special &&
+  board[y][x].type === board[y][x-1].type
+){
         count++;
       }else{
         if(count>=3){
@@ -392,7 +626,13 @@ if(isJustCreated(y,x) || isJustCreated(y-1,x)){
   continue;
 }
 
-      if(board[y][x].type===board[y-1][x].type){
+      if(
+  board[y][x] &&
+  board[y-1][x] &&
+  !board[y][x].special &&
+  !board[y-1][x].special &&
+  board[y][x].type === board[y-1][x].type
+){
         count++;
       }else{
         if(count>=3){
@@ -420,6 +660,24 @@ function resolveLoop(){
 
   if(groups.length===0){
     
+    // ===== ⭐ Indigo 第二段爆炸 =====
+if(pendingExplosion && pendingExplosion.step === 1){
+
+  pendingExplosion.step = 2;
+
+  setTimeout(()=>{
+    explode3x3(pendingExplosion.x, pendingExplosion.y);
+
+    setTimeout(()=>{
+      dropTiles();
+      setTimeout(resolveLoop,150);
+    },150);
+
+  },200);
+
+  return; // ⭐ 中斷結束流程
+}
+
     if(comboCount>=2){
   let bonus = comboCount*10;
   score += bonus;
@@ -433,6 +691,8 @@ function resolveLoop(){
     combo=0;
     comboCount=0;
     lastSwap = null;
+
+    pendingExplosion = null;
 
     // ⭐ 時間到 → 現在才結算
   if(timeUp && !gameOver){
