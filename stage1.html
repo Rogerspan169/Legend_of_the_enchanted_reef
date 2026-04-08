@@ -89,6 +89,8 @@ let plasticCleared = 0;
 
 let stageMessageTimer = 0;
 
+let movesLeft = 50;
+
 function showStageMessage(){
   stageMessageTimer = 180; // 3秒
 }
@@ -252,7 +254,11 @@ function draw(){
 }else{
   ctx.fillText("塑膠袋:"+plasticCleared+"/100",0,34);
 }
+  if(stage === 1){
   ctx.fillText("時間:"+timeLeft,0,84);
+}else{
+  ctx.fillText("步數:"+movesLeft,0,84);
+}
   //ctx.fillText("Combo:"+combo,380,50);
 
   // ===== 浮動文字 =====
@@ -315,7 +321,7 @@ function drawTile(tile,x,y){
 
 // ===== 點擊 =====
 canvas.addEventListener("click",(e)=>{
-  if(isAnimating || gameOver || timeUp) return;
+  if(isAnimating || gameOver || (stage === 1 && timeUp)) return;
 
   const rect=canvas.getBoundingClientRect();
   const x=Math.floor((e.clientX-rect.left)/TILE);
@@ -556,6 +562,11 @@ function handleJakeTrigger(x,y){
 // ===== 交換 =====
 function swap(a,b){
   isAnimating=true;
+
+  if(stage === 2){
+  movesLeft--;
+}
+
   combo=0;
   comboCount=0;
 
@@ -728,28 +739,28 @@ if(pendingExplosion && pendingExplosion.step === 1){
 }
 
 // ===== ⭐ 進入第二關 =====
-if(stage === 1 && score >= 800){
+//if(stage === 1 && score >= 800){
 
-  stage = 2;
+  //stage = 2;
 
   // 重置盤面
-  initBoard();
+  //initBoard();
 
   // 重置狀態
-  plasticCleared = 0;
+  //plasticCleared = 0;
 
   // 停止目前動畫
-  pendingExplosion = null;
-  pendingSkill = null;
-  pendingJake = null;
+  //pendingExplosion = null;
+  //pendingSkill = null;
+  //pendingJake = null;
 
   // 顯示提示
-  showStageMessage();
+  //showStageMessage();
 
-isAnimating = false; // ⭐⭐⭐ 關鍵修復
+//isAnimating = false; // ⭐⭐⭐ 關鍵修復
 
-  return;
-}
+  //return;
+//}
 
     ensurePlayable(); // ⭐ 防死局
 
@@ -880,6 +891,13 @@ if(lastSwap){
 
   justCreatedSpecial = null;
 
+  if(stage === 2 && movesLeft <= 0 && !gameOver){
+  gameOver = true;
+  setTimeout(()=>{
+    alert("步數用完！目前清除:"+plasticCleared);
+  },200);
+}
+
   if(stage === 2 && plasticCleared >= 100){
   gameOver = true;
   setTimeout(()=>{
@@ -915,22 +933,58 @@ function startTimer(){
 
     if(gameOver) return;
 
+    if(stage === 2) return; // ⭐ 新增
+
     if(timeLeft > 0){
       timeLeft--;
     }
 
     if(timeLeft <= 0){
-      timeLeft = 0;
-      timeUp = true;
+  timeLeft = 0;
+  timeUp = true;
 
-      // ⭐ 沒在動畫 → 立即結算
-      if(!isAnimating){
+  if(!isAnimating){
+
+    // ⭐ 第一關結算 & 決定是否進第二關
+    if(stage === 1){
+
+      if(score >= 800){
+        // ✅ 成功 → 進第二關
+        stage = 2;
+
+        initBoard();
+
+        plasticCleared = 0;
+
+        pendingExplosion = null;
+        pendingSkill = null;
+        pendingJake = null;
+
+        movesLeft = 50; // ⭐ 記得加這行（回合制）
+
+        showStageMessage();
+
+        timeUp = false;   // ⭐ 很重要！不然會鎖住
+        return;
+      }
+      else{
+        // ❌ 失敗
         gameOver = true;
+
         setTimeout(()=>{
-          alert("時間到！分數:"+score);
+          alert(
+            "任務失敗！原生珊瑚礁白化加速，請再接再厲!\n你的分數:"+score
+          );
         },100);
+
+        return;
       }
     }
+
+    // ⭐ 第二關（如果你之後要加）
+    gameOver = true;
+  }
+}
 
   },1000);
 }
