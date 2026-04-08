@@ -29,6 +29,8 @@ const TILE = 50;
 const TYPES = 5;
 const OFFSET_Y = 100;
 
+const PLASTIC = 0;
+
 // ===== 圖片 =====
 const images = [];
 const imagePaths = [
@@ -81,6 +83,15 @@ let pendingSkill = null;
 let pendingExplosion = null;
 
 let pendingJake = null;
+
+let stage = 1;
+let plasticCleared = 0;
+
+let stageMessageTimer = 0;
+
+function showStageMessage(){
+  stageMessageTimer = 180; // 3秒
+}
 
 // ===== 初始化 =====
 
@@ -236,7 +247,11 @@ function draw(){
 
   ctx.fillStyle="white";
   ctx.font="18px Arial";
+ if(stage === 1){
   ctx.fillText("分數:"+score,0,34);
+}else{
+  ctx.fillText("塑膠袋:"+plasticCleared+"/100",0,34);
+}
   ctx.fillText("時間:"+timeLeft,0,84);
   //ctx.fillText("Combo:"+combo,380,50);
 
@@ -271,6 +286,18 @@ if(pendingJake){
     pendingJake.y*TILE+OFFSET_Y,
     TILE,TILE
   );
+}
+
+if(stageMessageTimer > 0){
+
+  ctx.fillStyle = "white";
+  ctx.font = "22px Arial";
+  ctx.textAlign = "center";
+
+  ctx.fillText("STAGE 2", canvas.width/2, 40);
+  ctx.fillText("關卡目標: 清除100個塑膠袋!", canvas.width/2, 80);
+
+  stageMessageTimer--;
 }
 }
 
@@ -385,9 +412,14 @@ function handleSkillTrigger(x,y){
   }
 
   // ===== 消除 =====
-  cleared.forEach(([yy,xx])=>{
-    board[yy][xx] = null;
-  });
+cleared.forEach(([yy,xx])=>{
+
+  if(stage === 2 && board[yy][xx]?.type === PLASTIC){
+    plasticCleared++;
+  }
+
+  board[yy][xx] = null;
+});
 
   // ===== 移除 Shorty 本身 =====
   board[sy][sx] = null;
@@ -442,6 +474,11 @@ function explode3x3(cx,cy){
   }
 
   cleared.forEach(([y,x])=>{
+
+    if(stage === 2 && board[y][x]?.type === PLASTIC){
+  plasticCleared++;
+}
+
     board[y][x] = null;
   });
 
@@ -487,6 +524,11 @@ function handleJakeTrigger(x,y){
 
   // ===== 清除 =====
   cleared.forEach(([yy,xx])=>{
+
+    if(stage === 2 && board[yy][xx]?.type === PLASTIC){
+  plasticCleared++;
+}
+
     board[yy][xx] = null;
   });
 
@@ -685,6 +727,30 @@ if(pendingExplosion && pendingExplosion.step === 1){
   addFloatingText(200, 50, "COMBO +" + bonus);
 }
 
+// ===== ⭐ 進入第二關 =====
+if(stage === 1 && score >= 800){
+
+  stage = 2;
+
+  // 重置盤面
+  initBoard();
+
+  // 重置狀態
+  plasticCleared = 0;
+
+  // 停止目前動畫
+  pendingExplosion = null;
+  pendingSkill = null;
+  pendingJake = null;
+
+  // 顯示提示
+  showStageMessage();
+
+isAnimating = false; // ⭐⭐⭐ 關鍵修復
+
+  return;
+}
+
     ensurePlayable(); // ⭐ 防死局
 
     isAnimating=false;
@@ -787,9 +853,14 @@ if(lastSwap){
   let original = board[cy][cx] ? board[cy][cx].type : Math.floor(Math.random()*TYPES);
 
   group.forEach(([y,x])=>{
-    if(y===cy&&x===cx) return;
-    board[y][x]=null;
-  });
+  if(y===cy&&x===cx) return;
+
+  if(stage === 2 && board[y][x]?.type === PLASTIC){
+    plasticCleared++;
+  }
+
+  board[y][x]=null;
+});
 
   if(special){
     board[cy][cx]={type:original,special};
@@ -808,6 +879,13 @@ if(lastSwap){
   },150);
 
   justCreatedSpecial = null;
+
+  if(stage === 2 && plasticCleared >= 100){
+  gameOver = true;
+  setTimeout(()=>{
+    alert("任務完成！你拯救了海洋 🌊");
+  },200);
+}
 }
 
 // ===== 掉落 =====
