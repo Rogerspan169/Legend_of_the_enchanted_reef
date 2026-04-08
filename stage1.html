@@ -91,6 +91,9 @@ let stageMessageTimer = 0;
 
 let movesLeft = 50;
 
+let stageResultMessage = "";
+let stageResultTimer = 0;
+
 function showStageMessage(){
   stageMessageTimer = 180; // 3秒
 }
@@ -304,6 +307,24 @@ if(stageMessageTimer > 0){
   ctx.fillText("關卡目標: 清除100個塑膠袋!", canvas.width/2, 80);
 
   stageMessageTimer--;
+}
+
+if(stageResultTimer > 0){
+
+  ctx.fillStyle = "rgba(0,0,0,0.7)";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.fillStyle = "white";
+  ctx.font = "20px Arial";
+  ctx.textAlign = "center";
+
+  let lines = stageResultMessage.split("\n");
+
+  lines.forEach((line, i)=>{
+    ctx.fillText(line, canvas.width/2, 250 + i*30);
+  });
+
+  stageResultTimer--;
 }
 }
 
@@ -738,29 +759,6 @@ if(pendingExplosion && pendingExplosion.step === 1){
   addFloatingText(200, 50, "COMBO +" + bonus);
 }
 
-// ===== ⭐ 進入第二關 =====
-//if(stage === 1 && score >= 800){
-
-  //stage = 2;
-
-  // 重置盤面
-  //initBoard();
-
-  // 重置狀態
-  //plasticCleared = 0;
-
-  // 停止目前動畫
-  //pendingExplosion = null;
-  //pendingSkill = null;
-  //pendingJake = null;
-
-  // 顯示提示
-  //showStageMessage();
-
-//isAnimating = false; // ⭐⭐⭐ 關鍵修復
-
-  //return;
-//}
 
     ensurePlayable(); // ⭐ 防死局
 
@@ -864,12 +862,15 @@ if(lastSwap){
   let original = board[cy][cx] ? board[cy][cx].type : Math.floor(Math.random()*TYPES);
 
   group.forEach(([y,x])=>{
-  if(y===cy&&x===cx) return;
 
   if(stage === 2 && board[y][x]?.type === PLASTIC){
     plasticCleared++;
   }
 
+});
+
+group.forEach(([y,x])=>{
+  if(y===cy&&x===cx) return;
   board[y][x]=null;
 });
 
@@ -945,45 +946,44 @@ function startTimer(){
 
   if(!isAnimating){
 
-    // ⭐ 第一關結算 & 決定是否進第二關
-    if(stage === 1){
+  gameOver = true;
 
-      if(score >= 800){
-        // ✅ 成功 → 進第二關
-        stage = 2;
+  if(score >= 800){
+    stageResultMessage =
+      "任務完成！你阻止了原生珊瑚礁繼續白化!\n你的分數:" + score;
+  }else{
+    stageResultMessage =
+      "任務失敗！原生珊瑚礁白化加速，請再接再厲!\n你的分數:" + score;
+  }
 
-        initBoard();
+  stageResultTimer = 180;
 
-        plasticCleared = 0;
+  // ⭐ 延遲進關
+  setTimeout(()=>{
 
-        pendingExplosion = null;
-        pendingSkill = null;
-        pendingJake = null;
+    if(score >= 800){
 
-        movesLeft = 50; // ⭐ 記得加這行（回合制）
+      stage = 2;
 
-        showStageMessage();
+      initBoard();
 
-        timeUp = false;   // ⭐ 很重要！不然會鎖住
-        return;
-      }
-      else{
-        // ❌ 失敗
-        gameOver = true;
+      plasticCleared = 0;
 
-        setTimeout(()=>{
-          alert(
-            "任務失敗！原生珊瑚礁白化加速，請再接再厲!\n你的分數:"+score
-          );
-        },100);
+      pendingExplosion = null;
+      pendingSkill = null;
+      pendingJake = null;
 
-        return;
-      }
+      movesLeft = 50;
+
+      timeUp = false;
+      gameOver = false;
+
+      showStageMessage();
+
     }
 
-    // ⭐ 第二關（如果你之後要加）
-    gameOver = true;
-  }
+  }, 3000); // 等3秒
+}
 }
 
   },1000);
