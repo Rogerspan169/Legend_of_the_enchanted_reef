@@ -98,6 +98,8 @@ let gameStarted = false;
 
 let pendingExplosions = []; // ⭐ 取代 pendingExplosion
 
+let pendingJakeChains = [];
+
 function showStageMessage(){
   stageMessageTimer = 180; // 3秒
 }
@@ -541,8 +543,10 @@ function explodeAroundKeepCenter(cx,cy){
 
 function triggerIndigo(x, y){
 
-  // 防重複加入
-  if(pendingExplosions.some(p => p.x===x && p.y===y)){
+  const tile = board[y][x];
+
+  // 防止重複加入
+  if(pendingExplosions.some(p => p.ref === tile)){
     return;
   }
 
@@ -551,9 +555,7 @@ function triggerIndigo(x, y){
   explodeAroundKeepCenter(x, y);
 
   pendingExplosions.push({
-    x: x,
-    y: y,
-    step: 1
+    ref: tile // ⭐ 改這裡
   });
 
   setTimeout(()=>{
@@ -630,9 +632,20 @@ function triggerJakeChain(y,x){
   }
 }
 
+function isAdjacent(sx,sy,x,y){
+  return Math.abs(sx-x)<=1 && Math.abs(sy-y)<=1 && !(sx===x && sy===y);
+}
+
 function handleJakeTrigger(x,y){
 
   const {x:sx, y:sy} = pendingJake;
+
+  // ⭐ 不是周圍 → 當作重新選
+  if(!isAdjacent(sx,sy,x,y)){
+    pendingJake = null;
+    selected = {x,y};
+    return;
+  }
 
   const target = board[y]?.[x];
 
@@ -858,9 +871,6 @@ function destroyTile(y, x){
   const tile = board[y]?.[x];
   if(!tile) return;
 
-  // ⭐ 防止重複觸發（很重要！避免無限連鎖）
-  board[y][x] = null;
-
   // ⭐ Stage 2 計數
   if(stage === 2 && tile.type === PLASTIC){
     plasticCleared++;
@@ -871,16 +881,19 @@ function destroyTile(y, x){
     triggerRandomLine(y, x);
   }
   else if(tile.special === "T"){
-
-  pendingExplosions.push({
-    x: x,
-    y: y,
-    step: 1
-  });
+  // ⭐ 被動觸發才加入（避免手動觸發重複加入）
+  if(!pendingExplosions.some(p => p.ref === tile)){
+    pendingExplosions.push({
+      ref: tile   // ⭐ 用物件追蹤，不用座標
+    });
+  }
 }
   else if(tile.special === "line5"){
-    triggerJakeChain(y, x);
-  }
+  pendingJakeChains.push({y, x});
+}
+
+  // ⭐ 最後才刪除
+  board[y][x] = null;
 }
 
 function findIndigoPosition(){
@@ -904,6 +917,25 @@ function resolveLoop(){
 
   if(groups.length===0){
     
+  // ===== ⭐ Jake 延遲觸發 =====
+if(pendingJakeChains.length > 0){
+
+  let j = pendingJakeChains.shift();
+
+  setTimeout(()=>{
+
+    triggerJakeChain(j.y, j.x);
+
+    setTimeout(()=>{
+      dropTiles();
+      setTimeout(resolveLoop,150);
+    },150);
+
+  },200);
+
+  return;
+}
+  
     // ===== ⭐ Indigo 第二段爆炸 =====
 if(pendingExplosions.length > 0){
 
@@ -911,9 +943,19 @@ if(pendingExplosions.length > 0){
 
   setTimeout(()=>{
 
-    // ⭐ 用當前位置（掉落後）
-    if(board[exp.y] && board[exp.y][exp.x]){
-      explode3x3(exp.x, exp.y);
+    // ⭐ 找這顆 tile 現在的位置
+    let found = null;
+
+    for(let y=0;y<SIZE;y++){
+      for(let x=0;x<SIZE;x++){
+        if(board[y][x] === exp.ref){
+          found = {x, y};
+        }
+      }
+    }
+
+    if(found){
+      explode3x3(found.x, found.y);
     }
 
     setTimeout(()=>{
