@@ -80,7 +80,7 @@ let justCreatedSpecial = null;
 
 let pendingSkill = null;
 
-let pendingExplosion = null;
+//let pendingExplosion = null;
 
 let pendingJake = null;
 
@@ -93,6 +93,10 @@ let movesLeft = 50;
 
 let stageResultMessage = "";
 let stageResultTimer = 0;
+
+let gameStarted = false;
+
+let pendingExplosions = []; // ⭐ 取代 pendingExplosion
 
 function showStageMessage(){
   stageMessageTimer = 180; // 3秒
@@ -252,15 +256,16 @@ function draw(){
 
   ctx.fillStyle="white";
   ctx.font="18px Arial";
+  ctx.textAlign = "left";
  if(stage === 1){
   ctx.fillText("分數:"+score,0,34);
 }else{
-  ctx.fillText("塑膠袋:"+plasticCleared+"/100",0,34);
+  ctx.fillText("已清除塑膠袋:"+plasticCleared+"/100",0,34);
 }
   if(stage === 1){
   ctx.fillText("時間:"+timeLeft,0,84);
 }else{
-  ctx.fillText("步數:"+movesLeft,0,84);
+  ctx.fillText("剩餘步數:"+movesLeft,0,84);
 }
   //ctx.fillText("Combo:"+combo,380,50);
 
@@ -326,6 +331,26 @@ if(stageResultTimer > 0){
 
   stageResultTimer--;
 }
+
+if(!gameStarted){
+
+  ctx.fillStyle = "rgba(0,0,0,0.7)";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  ctx.fillStyle = "white";
+  ctx.font = "22px Arial";
+  ctx.textAlign = "center";
+
+  ctx.fillText("關卡目標", canvas.width/2, 200);
+  ctx.fillText("達到 800 分", canvas.width/2, 240);
+
+  // 按鈕
+  ctx.fillStyle = "green";
+  ctx.fillRect(180, 300, 140, 50);
+
+  ctx.fillStyle = "white";
+  ctx.fillText("開始遊戲", canvas.width/2, 335);
+}
 }
 
 function drawTile(tile,x,y){
@@ -342,6 +367,20 @@ function drawTile(tile,x,y){
 
 // ===== 點擊 =====
 canvas.addEventListener("click",(e)=>{
+  if(!gameStarted){
+
+  const rect=canvas.getBoundingClientRect();
+  const mx=e.clientX-rect.left;
+  const my=e.clientY-rect.top;
+
+  // 按鈕範圍
+  if(mx>=180 && mx<=320 && my>=300 && my<=350){
+    gameStarted = true;
+  }
+
+  return;
+}
+
   if(isAnimating || gameOver || (stage === 1 && timeUp)) return;
 
   const rect=canvas.getBoundingClientRect();
@@ -469,14 +508,53 @@ cleared.forEach(([yy,xx])=>{
   },150);
 }
 
-function triggerIndigo(x,y){
+function explodeAroundKeepCenter(cx,cy){
+
+  let hit = 0; // ⭐ 新增
+
+  for(let dy=-1;dy<=1;dy++){
+    for(let dx=-1;dx<=1;dx++){
+
+      let x = cx + dx;
+      let y = cy + dy;
+
+      if(x<0||x>=SIZE||y<0||y>=SIZE) continue;
+      if(x===cx && y===cy) continue;
+
+      if(board[y][x]){ // ⭐ 有東西才算
+        hit++;
+      }
+
+      destroyTile(y,x);
+    }
+  }
+
+  let gain = hit * 5; // ⭐ 改這裡
+  score += gain;
+
+  addFloatingText(
+    cx*TILE,
+    cy*TILE+OFFSET_Y,
+    "BOOM +" + gain
+  );
+}
+
+function triggerIndigo(x, y){
+
+  // 防重複加入
+  if(pendingExplosions.some(p => p.x===x && p.y===y)){
+    return;
+  }
 
   isAnimating = true;
 
-  // ⭐ 記錄位置（之後第二次用）
-  pendingExplosion = {x,y, step:1};
+  explodeAroundKeepCenter(x, y);
 
-  explode3x3(x,y);
+  pendingExplosions.push({
+    x: x,
+    y: y,
+    step: 1
+  });
 
   setTimeout(()=>{
     dropTiles();
@@ -506,7 +584,7 @@ function explode3x3(cx,cy){
   plasticCleared++;
 }
 
-    board[y][x] = null;
+    destroyTile(y, x);
   });
 
   let gain = (cleared.length - 1) * 5;
@@ -517,6 +595,39 @@ function explode3x3(cx,cy){
     cy*TILE+OFFSET_Y,
     "BOOM +" + gain
   );
+}
+
+function triggerJakeChain(y,x){
+
+  let neighbors = [];
+
+  for(let dy=-1;dy<=1;dy++){
+    for(let dx=-1;dx<=1;dx++){
+
+      let nx = x + dx;
+      let ny = y + dy;
+
+      if(nx<0||nx>=SIZE||ny<0||ny>=SIZE) continue;
+      if(nx===x && ny===y) continue;
+
+      if(board[ny][nx] && !board[ny][nx].special){
+        neighbors.push([ny,nx]);
+      }
+    }
+  }
+
+  if(neighbors.length === 0) return;
+
+  let [ty,tx] = neighbors[Math.floor(Math.random()*neighbors.length)];
+  let targetType = board[ty][tx].type;
+
+  for(let yy=0; yy<SIZE; yy++){
+    for(let xx=0; xx<SIZE; xx++){
+      if(board[yy][xx] && board[yy][xx].type === targetType){
+        destroyTile(yy,xx);
+      }
+    }
+  }
 }
 
 function handleJakeTrigger(x,y){
@@ -727,6 +838,65 @@ if(isJustCreated(y,x) || isJustCreated(y-1,x)){
   return groups;
 }
 
+function triggerRandomLine(y,x){
+
+  let isRow = Math.random() < 0.5;
+
+  if(isRow){
+    for(let i=0;i<SIZE;i++){
+      if(i!==x) destroyTile(y,i);
+    }
+  }else{
+    for(let i=0;i<SIZE;i++){
+      if(i!==y) destroyTile(i,x);
+    }
+  }
+}
+
+function destroyTile(y, x){
+
+  const tile = board[y]?.[x];
+  if(!tile) return;
+
+  // ⭐ 防止重複觸發（很重要！避免無限連鎖）
+  board[y][x] = null;
+
+  // ⭐ Stage 2 計數
+  if(stage === 2 && tile.type === PLASTIC){
+    plasticCleared++;
+  }
+
+  // ⭐ 特殊方塊觸發
+  if(tile.special === "line4"){
+    triggerRandomLine(y, x);
+  }
+  else if(tile.special === "T"){
+
+  pendingExplosions.push({
+    x: x,
+    y: y,
+    step: 1
+  });
+}
+  else if(tile.special === "line5"){
+    triggerJakeChain(y, x);
+  }
+}
+
+function findIndigoPosition(){
+
+  for(let y=0;y<SIZE;y++){
+    for(let x=0;x<SIZE;x++){
+      if(board[y][x] &&
+         board[y][x].special === "T"){
+        return {x, y};
+      }
+    }
+  }
+
+  return null;
+}
+
 // ===== 核心連鎖流程 =====
 function resolveLoop(){
 
@@ -735,12 +905,16 @@ function resolveLoop(){
   if(groups.length===0){
     
     // ===== ⭐ Indigo 第二段爆炸 =====
-if(pendingExplosion && pendingExplosion.step === 1){
+if(pendingExplosions.length > 0){
 
-  pendingExplosion.step = 2;
+  let exp = pendingExplosions.shift(); // ⭐ 取出一顆
 
   setTimeout(()=>{
-    explode3x3(pendingExplosion.x, pendingExplosion.y);
+
+    // ⭐ 用當前位置（掉落後）
+    if(board[exp.y] && board[exp.y][exp.x]){
+      explode3x3(exp.x, exp.y);
+    }
 
     setTimeout(()=>{
       dropTiles();
@@ -749,7 +923,7 @@ if(pendingExplosion && pendingExplosion.step === 1){
 
   },200);
 
-  return; // ⭐ 中斷結束流程
+  return;
 }
 
     if(comboCount>=2){
@@ -767,15 +941,7 @@ if(pendingExplosion && pendingExplosion.step === 1){
     comboCount=0;
     lastSwap = null;
 
-    pendingExplosion = null;
-
-    // ⭐ 時間到 → 現在才結算
-  if(timeUp && !gameOver){
-    gameOver = true;
-    setTimeout(()=>{
-      alert("時間到！分數:"+score);
-    },200);
-  }
+    pendingExplosions = [];
 
     return;
   }
@@ -930,61 +1096,58 @@ function gameLoop(){
 
 // ===== 計時 =====
 function startTimer(){
+
   setInterval(()=>{
 
-    if(gameOver) return;
+    if(!gameStarted) return; // ⭐ 改放這裡
 
-    if(stage === 2) return; // ⭐ 新增
+    if(gameOver) return;
+    if(stage === 2) return;
 
     if(timeLeft > 0){
       timeLeft--;
     }
 
     if(timeLeft <= 0){
-  timeLeft = 0;
-  timeUp = true;
+      timeLeft = 0;
+      timeUp = true;
 
-  if(!isAnimating){
+      if(!isAnimating){
 
-  gameOver = true;
+        gameOver = true;
 
-  if(score >= 800){
-    stageResultMessage =
-      "任務完成！你阻止了原生珊瑚礁繼續白化!\n你的分數:" + score;
-  }else{
-    stageResultMessage =
-      "任務失敗！原生珊瑚礁白化加速，請再接再厲!\n你的分數:" + score;
-  }
+        if(score >= 800){
+          stageResultMessage =
+            "任務完成！你阻止了原生珊瑚礁繼續白化!\n你的分數:" + score;
+        }else{
+          stageResultMessage =
+            "任務失敗！原生珊瑚礁白化加速，請再接再厲!\n你的分數:" + score;
+        }
 
-  stageResultTimer = 180;
+        stageResultTimer = 180;
 
-  // ⭐ 延遲進關
-  setTimeout(()=>{
+        setTimeout(()=>{
+          if(score >= 800){
 
-    if(score >= 800){
+            stage = 2;
+            initBoard();
 
-      stage = 2;
+            plasticCleared = 0;
 
-      initBoard();
+            pendingExplosions = [];
+            pendingSkill = null;
+            pendingJake = null;
 
-      plasticCleared = 0;
+            movesLeft = 50;
 
-      pendingExplosion = null;
-      pendingSkill = null;
-      pendingJake = null;
+            timeUp = false;
+            gameOver = false;
 
-      movesLeft = 50;
-
-      timeUp = false;
-      gameOver = false;
-
-      showStageMessage();
-
+            showStageMessage();
+          }
+        },3000);
+      }
     }
-
-  }, 3000); // 等3秒
-}
-}
 
   },1000);
 }
