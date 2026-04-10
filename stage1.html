@@ -1,10 +1,9 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
-<head>
-<meta charset="UTF-8">
-<title>海洋三消（完整版）</title>
-<style>
-body {
+  <head> <meta charset="UTF-8">
+  <title>海洋三消（完整版）</title>
+  <style>
+  body {
   background: #0b2a3c;
   display: flex;
   justify-content: center;
@@ -14,14 +13,47 @@ canvas {
   background: #0e3f5a;
   border: 3px solid white;
 }
+
+.overlay{
+  position: fixed;
+  top:0;
+  left:0;
+  width:100%;
+  height:100%;
+  background: rgba(0,0,0,0.7);
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  z-index:999;
+}
+
+.hidden{
+  display:none;
+}
+
+.panel{
+  background:white;
+  padding:30px;
+  border-radius:12px;
+  text-align:center;
+  font-size:24px;
+}  
+
 </style>
 </head>
 <body>
 
-<canvas id="game" width="500" height="600"></canvas>
+<div id="resultUI" class="overlay hidden">
+  <div class="panel">
+    <h1 id="resultTitle"></h1>
+    <button onclick="restartGame()">再玩一次</button>
+  </div>
+</div>
+
+<canvas id="game" width="500" height="600"></canvas>  
 
 <script>
-const canvas = document.getElementById("game");
+  const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
 const SIZE = 10;
@@ -486,11 +518,11 @@ cleared.forEach(([yy,xx])=>{
     plasticCleared++;
   }
 
-  board[yy][xx] = null;
+  destroyTile(yy, xx); // ⭐ 改這裡
 });
 
   // ===== 移除 Shorty 本身 =====
-  board[sy][sx] = null;
+ destroyTile(sy, sx);
 
   // ===== 分數（你可以調整）=====
   let gain = (cleared.length - 1) * 5;
@@ -676,15 +708,15 @@ function handleJakeTrigger(x,y){
   // ===== 清除 =====
   cleared.forEach(([yy,xx])=>{
 
-    if(stage === 2 && board[yy][xx]?.type === PLASTIC){
-  plasticCleared++;
-}
+  if(stage === 2 && board[yy][xx]?.type === PLASTIC){
+    plasticCleared++;
+  }
 
-    board[yy][xx] = null;
-  });
+  destroyTile(yy, xx); // ⭐ 改這裡
+});
 
   // ===== 移除 Jake 本身 =====
-  board[sy][sx] = null;
+destroyTile(sy, sx);
 
   // ===== 分數（可以調整）=====
   let gain = cleared.length * 10;
@@ -876,21 +908,18 @@ function destroyTile(y, x){
     plasticCleared++;
   }
 
-  // ⭐ 特殊方塊觸發
+  // ⭐ 特殊方塊觸發（先觸發）
   if(tile.special === "line4"){
     triggerRandomLine(y, x);
   }
   else if(tile.special === "T"){
-  // ⭐ 被動觸發才加入（避免手動觸發重複加入）
-  if(!pendingExplosions.some(p => p.ref === tile)){
-    pendingExplosions.push({
-      ref: tile   // ⭐ 用物件追蹤，不用座標
-    });
+    if(!pendingExplosions.some(p => p.ref === tile)){
+      pendingExplosions.push({ ref: tile });
+    }
   }
-}
   else if(tile.special === "line5"){
-  pendingJakeChains.push({y, x});
-}
+    triggerJakeChain(y, x); // ⭐ ⭐ ⭐ 直接觸發
+  }
 
   // ⭐ 最後才刪除
   board[y][x] = null;
@@ -922,18 +951,19 @@ if(pendingJakeChains.length > 0){
 
   let j = pendingJakeChains.shift();
 
-  setTimeout(()=>{
+let found = null;
 
-    triggerJakeChain(j.y, j.x);
+for(let y=0;y<SIZE;y++){
+  for(let x=0;x<SIZE;x++){
+    if(board[y][x] === j.ref){
+      found = {x, y};
+    }
+  }
+}
 
-    setTimeout(()=>{
-      dropTiles();
-      setTimeout(resolveLoop,150);
-    },150);
-
-  },200);
-
-  return;
+if(found){
+  triggerJakeChain(found.y, found.x);
+}
 }
   
     // ===== ⭐ Indigo 第二段爆炸 =====
@@ -1100,18 +1130,17 @@ group.forEach(([y,x])=>{
 
   justCreatedSpecial = null;
 
-  if(stage === 2 && movesLeft <= 0 && !gameOver){
-  gameOver = true;
-  setTimeout(()=>{
-    alert("步數用完！目前清除:"+plasticCleared);
-  },200);
-}
+  if(stage === 2){
 
-  if(stage === 2 && plasticCleared >= 100){
-  gameOver = true;
-  setTimeout(()=>{
-    alert("任務完成！你拯救了海洋 🌊");
-  },200);
+  if(plasticCleared >= 100){
+    showResult(true);
+    return;
+  }
+
+  if(movesLeft <= 0){
+    showResult(false);
+    return;
+  }
 }
 }
 
@@ -1193,7 +1222,27 @@ function startTimer(){
 
   },1000);
 }
-</script>
 
+function showResult(success){
+
+  gameActive = false;
+
+  const ui = document.getElementById("resultUI");
+  const title = document.getElementById("resultTitle");
+
+  if(success){
+    title.innerText = "任務完成！你拯救了水母樂園!";
+  }else{
+    title.innerText = "任務失敗！現在水母樂園充斥著塑膠垃圾，請繼續努力!";
+  }
+
+  ui.classList.remove("hidden");
+}
+
+function restartGame(){
+  location.reload();
+}
+
+</script>
 </body>
 </html>
