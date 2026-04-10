@@ -132,6 +132,8 @@ let pendingExplosions = []; // ⭐ 取代 pendingExplosion
 
 let pendingJakeChains = [];
 
+let explodingNow = new Set();
+
 function showStageMessage(){
   stageMessageTimer = 180; // 3秒
 }
@@ -486,6 +488,10 @@ if(tile.special === "line5"){
 
 function handleSkillTrigger(x,y){
 
+  if(stage === 2){
+    movesLeft--; // ⭐ 加這行
+  }
+
   const {x:sx, y:sy} = pendingSkill;
 
   // ===== 不同行列 → 取消 =====
@@ -574,6 +580,10 @@ function explodeAroundKeepCenter(cx,cy){
 }
 
 function triggerIndigo(x, y){
+
+if(stage === 2){
+    movesLeft--; // ⭐ 加這行
+  }
 
   const tile = board[y][x];
 
@@ -670,6 +680,10 @@ function isAdjacent(sx,sy,x,y){
 
 function handleJakeTrigger(x,y){
 
+if(stage === 2){
+    movesLeft--; // ⭐ 加這行
+  }
+  
   const {x:sx, y:sy} = pendingJake;
 
   // ⭐ 不是周圍 → 當作重新選
@@ -913,10 +927,17 @@ function destroyTile(y, x){
     triggerRandomLine(y, x);
   }
   else if(tile.special === "T"){
-    if(!pendingExplosions.some(p => p.ref === tile)){
+
+  if(!explodingNow.has(tile)){
+
+    explodingNow.add(tile);
+
+    explodeAroundKeepCenter(x, y);
+
       pendingExplosions.push({ ref: tile });
-    }
+
   }
+}
   else if(tile.special === "line5"){
     triggerJakeChain(y, x); // ⭐ ⭐ ⭐ 直接觸發
   }
@@ -1142,6 +1163,7 @@ group.forEach(([y,x])=>{
     return;
   }
 }
+explodingNow.clear();
 }
 
 // ===== 掉落 =====
