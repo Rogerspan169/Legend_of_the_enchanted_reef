@@ -112,8 +112,6 @@ let justCreatedSpecial = null;
 
 let pendingSkill = null;
 
-//let pendingExplosion = null;
-
 let pendingJake = null;
 
 let stage = 1;
@@ -370,13 +368,14 @@ if(stageResultTimer > 0){
 
 if(!gameStarted){
 
-  ctx.fillStyle = "rgba(0,0,0,0.7)";
+  ctx.fillStyle = "black"; // ✅ 改這裡
   ctx.fillRect(0,0,canvas.width,canvas.height);
 
   ctx.fillStyle = "white";
   ctx.font = "22px Arial";
   ctx.textAlign = "center";
 
+  ctx.fillText("第1關:阻止原生珊瑚礁繼續白化", canvas.width/2, 140);
   ctx.fillText("關卡目標", canvas.width/2, 200);
   ctx.fillText("達到 800 分", canvas.width/2, 240);
 
