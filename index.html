@@ -103,6 +103,7 @@
       </div>
       <p>註：本遊戲介面設計以手機使用者為主，於電腦瀏覽時部分內容可能無法完整顯示。</p>
       <button onclick="startGame()">作戰開始</button>
+      <button onclick="goToRules()">遊戲規則</button>
     </div>
   </div>
 
@@ -112,6 +113,10 @@
       // 若遊戲與 index.html 同目錄，直接跳轉
       location.href = "./stage1.html";
     }
+
+    function goToRules() {
+  location.href = ".intro"; // ⚠️ 這裡填你的規則頁檔名
+}
   </script>
 </body>
 </html>
