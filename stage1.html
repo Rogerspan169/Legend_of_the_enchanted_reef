@@ -324,7 +324,7 @@ function handleOverlayAction() {
 // (此處保留你原本的邏輯函數：swap, findMatches, resolveLoop, dropTiles, destroyTile... 等)
 // 注意：請確保在 resolveLoop 結尾處判斷 Stage 2 的勝負
 
-function swap(a,b){
+/*function swap(a,b){
   isAnimating=true;
   if(stage === 2) movesLeft--;
   [board[a.y][a.x], board[b.y][b.x]] = [board[b.y][b.x], board[a.y][a.x]];
@@ -337,7 +337,7 @@ function swap(a,b){
       resolveLoop();
     }
   }, 150);
-}
+}*/
 
 function findMatches(){
   let groups=[];
@@ -611,7 +611,10 @@ group.forEach(([y,x])=>{
 
   if(stage === 2){
     if(plasticCleared >= 100){ showResult(true); return; }
-    if(movesLeft <= 0 && !isAnimating){ showResult(false); return; }
+    if(movesLeft <= 0){
+    showResult(false);
+    return;
+  }
   }
 explodingNow.clear();
 }
@@ -892,30 +895,39 @@ destroyTile(sy, sx);
 
 // ===== 交換 =====
 function swap(a,b){
-  isAnimating=true;
+  isAnimating = true;
 
-  if(stage === 2){
-  movesLeft--;
-}
+  combo = 0;
+  comboCount = 0;
 
-  combo=0;
-  comboCount=0;
+  lastSwap = [a, b];
 
-  lastSwap = [a, b]; // ⭐ 記錄
-
-  [board[a.y][a.x],board[b.y][b.x]] =
-  [board[b.y][b.x],board[a.y][a.x]];
+  // 先交換
+  [board[a.y][a.x], board[b.y][b.x]] =
+  [board[b.y][b.x], board[a.y][a.x]];
 
   setTimeout(()=>{
-    let matches=findMatches();
 
-    if(matches.length===0){
-      [board[a.y][a.x],board[b.y][b.x]]=
-      [board[b.y][b.x],board[a.y][a.x]];
-      isAnimating=false;
+    let matches = findMatches();
+
+    if(matches.length === 0){
+
+      // ❌ 無效交換 → 換回去
+      [board[a.y][a.x], board[b.y][b.x]] =
+      [board[b.y][b.x], board[a.y][a.x]];
+
+      isAnimating = false;
+
     }else{
+
+      // ✅ 有成功消除 → 才扣步數
+      if(stage === 2){
+        movesLeft--;
+      }
+
       resolveLoop();
     }
+
   },150);
 }
 
