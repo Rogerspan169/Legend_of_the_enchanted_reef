@@ -88,6 +88,7 @@
         <p>3. 同類垃圾5個連成一線可產生小傑。<br>點擊小傑後再點選任一周圍九宮格的方塊即可消除盤面上所有同類的垃圾。</p>
       </div>
       <button onclick="startGame()">作戰開始</button>
+      <button onclick="goBack()">返回首頁</button>
     </div>
   </div>
 
@@ -97,6 +98,10 @@
       // 若遊戲與 index.html 同目錄，直接跳轉
       location.href = "./stage1.html";
     }
+
+    function goBack() {
+  location.href = "./index.html";
+}
   </script>
 </body>
 </html>
