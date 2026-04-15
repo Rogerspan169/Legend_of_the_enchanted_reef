@@ -74,6 +74,18 @@
       font-size: 0.9em;
       color: #ccc;
     }
+
+    .skill-img {
+  display: block;
+  margin: 10px auto;
+  width: 80px;
+  height: 80px;
+  object-fit: contain;
+}
+
+.skill-block {
+  margin-bottom: 20px;
+}
   </style>
 </head>
 <body>
@@ -81,12 +93,29 @@
   <div class="container">
     <div id="start-screen">
       <div class="intro">
-        <h3>🔍 規則介紹</h3>
-        <p>1. 以滑鼠或觸控點擊螢幕上相鄰的海底垃圾，使兩者交換位置，使同類垃圾3個連成一線即可將它們消除。</p>
-        <p>2. 同類垃圾4個連成一線可產生小不點。<br>點擊小不點後再點選任一同行/列的方塊即可消除整行/列的垃圾。</p>
-        <p>2. 同類垃圾連成T/L型或十字可產生藍藍。<br>雙擊藍藍即可消除周圍九宮格的垃圾兩次。</p>
-        <p>3. 同類垃圾5個連成一線可產生小傑。<br>點擊小傑後再點選任一周圍九宮格的方塊即可消除盤面上所有同類的垃圾。</p>
-      </div>
+  <h3>🔍 規則介紹</h3>
+
+  <p>1. 以滑鼠或觸控點擊螢幕上相鄰的海底垃圾，使兩者交換位置，使同類垃圾3個連成一線即可將它們消除。</p>
+
+  <div class="skill-block">
+    <p>2. 同類垃圾4個連成一線可產生小不點。</p>
+    <img class="skill-img" src="https://raw.githubusercontent.com/Rogerspan169/Legend_of_the_enchanted_reef/main/images/Shorty.png">
+    <p>點擊小不點後再點選任一同行/列的方塊即可消除整行/列的垃圾。</p>
+  </div>
+
+  <div class="skill-block">
+    <p>3. 同類垃圾連成T/L型或十字可產生藍藍。</p>
+    <img class="skill-img" src="https://raw.githubusercontent.com/Rogerspan169/Legend_of_the_enchanted_reef/main/images/Indigo.png">
+    <p>雙擊藍藍即可消除周圍九宮格的垃圾兩次。</p>
+  </div>
+
+  <div class="skill-block">
+    <p>4. 同類垃圾5個連成一線可產生小傑。</p>
+    <img class="skill-img" src="https://raw.githubusercontent.com/Rogerspan169/Legend_of_the_enchanted_reef/main/images/Jake.png">
+    <p>點擊小傑後再點選任一周圍九宮格的方塊即可消除盤面上所有同類的垃圾。</p>
+  </div>
+
+</div>
       <button onclick="startGame()">作戰開始</button>
       <button onclick="goBack()">返回首頁</button>
     </div>
