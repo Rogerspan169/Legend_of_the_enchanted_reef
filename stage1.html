@@ -76,10 +76,11 @@ let timeUp = false;
 let justCreatedSpecial = null;
 let pendingSkill = null;
 let pendingJake = null;
+let pendingIndigo = null;
 let stage = 1;
 let plasticCleared = 0;
 let stageMessageTimer = 0;
-let movesLeft = 50;
+let movesLeft = 40;
 let gameStarted = false;
 let pendingExplosions = [];
 let explodingNow = new Set();
@@ -197,6 +198,7 @@ function draw(){
   // 5. 技能提示
   if(pendingSkill) drawHighlight(pendingSkill.x, pendingSkill.y, "red");
   if(pendingJake) drawHighlight(pendingJake.x, pendingJake.y, "black");
+  if(pendingIndigo) drawHighlight(pendingIndigo.x, pendingIndigo.y, "blue");
 
   // 6. Stage 2 橫幅訊息
   if(stageMessageTimer > 0){
@@ -284,12 +286,17 @@ canvas.addEventListener("click",(e)=>{
 
   if(pendingSkill) { handleSkillTrigger(x,y); return; }
   if(pendingJake) { handleJakeTrigger(x,y); return; }
+  if(pendingIndigo) { 
+  handleIndigoTrigger(x,y); 
+  return; 
+}
 
   if(tile.special === "line4") { pendingSkill = {x,y}; return; }
   if(tile.special === "line5") { pendingJake = {x,y}; return; }
-  if(tile.special === "T" && selected?.x === x && selected?.y === y){
-    triggerIndigo(x,y); selected = null; return;
-  }
+  if(tile.special === "T") { 
+  pendingIndigo = {x,y}; 
+  return; 
+}
 
   if(!selected) { selected = {x,y}; }
   else {
@@ -308,7 +315,7 @@ function handleOverlayAction() {
     if (overlayConfig.action === 'next') {
         stage = 2;
         plasticCleared = 0;
-        movesLeft = 50;
+        movesLeft = 40;
         initBoard();
         stageMessageTimer = 180;
     } else if (overlayConfig.action === 'retry') {
@@ -687,8 +694,11 @@ function gameLoop(){
 function dropTiles(){
   for(let x=0;x<SIZE;x++){
     let col=[];
-    for(let y=SIZE-1;y>=0;y--){
-      if(board[y][x]) col.push(board[y][x]);
+for(let y=SIZE-1;y>=0;y--){
+      if(board[y][x]) {
+        delete board[y][x]._triggered; // ⭐ 重置
+        col.push(board[y][x]);
+      }
     }
     while(col.length<SIZE) col.push(randomTile());
 
@@ -703,28 +713,22 @@ function destroyTile(y, x){
   const tile = board[y]?.[x];
   if(!tile) return;
 
+  // ⭐ 防止重複觸發
+  if(tile._triggered) return;
+  tile._triggered = true;
+
   // ⭐ Stage 2 計數
   if(stage === 2 && tile.type === PLASTIC){
     plasticCleared++;
   }
 
   // ⭐ 特殊方塊觸發（先觸發）
-  if(tile.special === "line4"){
+  /*if(tile.special === "line4"){
     triggerRandomLine(y, x);
-  }
-  else if(tile.special === "T"){
-
-  if(!explodingNow.has(tile)){
-
-    explodingNow.add(tile);
-
-    explodeAroundKeepCenter(x, y);
-
-      pendingExplosions.push({ ref: tile });
-
-  }
-}
-  else if(tile.special === "line5"){
+  }*/
+// ❌ Indigo 不在 destroyTile 自動觸發
+// 👉 完全移除這段
+  if(tile.special === "line5"){
     triggerJakeChain(y, x); // ⭐ ⭐ ⭐ 直接觸發
   }
 
@@ -773,8 +777,13 @@ cleared.forEach(([yy,xx])=>{
   destroyTile(yy, xx); // ⭐ 改這裡
 });
 
-  // ===== 移除 Shorty 本身 =====
- destroyTile(sy, sx);
+// ⭐ 先取消特殊屬性，避免二次觸發
+if(board[sy][sx]){
+  board[sy][sx].special = null;
+}
+
+// 再刪除
+destroyTile(sy, sx);
 
   // ===== 分數（你可以調整）=====
   let gain = (cleared.length - 1) * 5;
@@ -1097,6 +1106,54 @@ function triggerJakeChain(y,x){
       }
     }
   }
+}
+
+function handleIndigoTrigger(x,y){
+
+  const {x:sx, y:sy} = pendingIndigo;
+
+  // ❌ 點自己 → 取消
+  if(x === sx && y === sy){
+    pendingIndigo = null;
+    return;
+  }
+
+  // ❌ 不在九宮格 → 取消
+  if(!isAdjacent(sx, sy, x, y)){
+    pendingIndigo = null;
+    selected = {x,y};
+    return;
+  }
+
+  if(stage === 2){
+    movesLeft--;
+  }
+
+  const tile = board[sy]?.[sx];
+  if(!tile || tile.special !== "T"){
+    pendingIndigo = null;
+    return;
+  }
+
+  isAnimating = true;
+
+  // ⭐ 觸發爆炸（第一段）
+  explodeAroundKeepCenter(sx, sy);
+
+  // ⭐ 加入第二段爆炸隊列（你原本就有）
+  pendingExplosions.push({
+    ref: tile
+  });
+
+  // ❌ 不要刪自己！！！
+  // destroyTile(sy, sx);
+
+  pendingIndigo = null;
+
+  setTimeout(()=>{
+    dropTiles();
+    setTimeout(resolveLoop,150);
+  },150);
 }
 
 // 由於程式碼長度限制，請將你原本程式碼中關於 
