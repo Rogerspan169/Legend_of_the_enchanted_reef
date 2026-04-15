@@ -865,10 +865,6 @@ if(stage === 2){
   // ===== 清除 =====
   cleared.forEach(([yy,xx])=>{
 
-  if(stage === 2 && board[yy][xx]?.type === PLASTIC){
-    plasticCleared++;
-  }
-
   destroyTile(yy, xx); // ⭐ 改這裡
 });
 
