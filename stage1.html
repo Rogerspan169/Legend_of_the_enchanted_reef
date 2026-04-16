@@ -441,16 +441,33 @@ function resolveLoop() {
                 for(let y=0;y<SIZE;y++) for(let x=0;x<SIZE;x++) if(board[y][x] === j.ref) found = {x, y};
                 if(found) triggerJakeChain(found.y, found.x);
             }
-            if(pendingExplosions.length > 0){
-                let exp = pendingExplosions.shift();
-                setTimeout(()=>{
-                    let found = null;
-                    for(let y=0;y<SIZE;y++) for(let x=0;x<SIZE;x++) if(board[y][x] === exp.ref) found = {x, y};
-                    if(found) explode3x3(found.x, found.y);
-                    setTimeout(()=>{ dropTiles(); setTimeout(resolveLoop, 150); }, 150);
-                }, 200);
-                return;
-            }
+            // 找到 resolveLoop 裡面處理 pendingExplosions 的部分，修改如下：
+if (pendingExplosions.length > 0) {
+  let exp = pendingExplosions.shift();
+
+  setTimeout(() => {
+    let found = null;
+    for (let y = 0; y < SIZE; y++) {
+      for (let x = 0; x < SIZE; x++) {
+        if (board[y][x] === exp.ref) {
+          found = { x, y };
+        }
+      }
+    }
+
+    if (found) {
+      explode3x3(found.x, found.y); // 第二段爆炸
+      board[found.y][found.x] = null; // ⭐ 關鍵：炸完後 Indigo 終於消失了
+    }
+
+    setTimeout(() => {
+      dropTiles();
+      setTimeout(resolveLoop, 150);
+    }, 150);
+  }, 200);
+
+  return;
+}
         }
 
         // ⭐⭐⭐ [修正] 穩定後的勝負判定 ⭐⭐⭐
@@ -653,41 +670,49 @@ for(let y=SIZE-1;y>=0;y--){
   }
 }
 
-function destroyTile(y, x){
-
+function destroyTile(y, x) {
   const tile = board[y]?.[x];
-  if(!tile) return;
-
-  // ⭐ 防止重複觸發
-  if(tile._triggered) return;
+  if (!tile || tile._triggered) return;
+  
+  // 標記為已觸發，防止連鎖時發生死迴圈（例如兩個 Indigo 互炸）
   tile._triggered = true;
 
-  // ⭐ Stage 2 計數
-  if(stage === 2 && tile.type === PLASTIC){
+  // Stage 2 計數
+  if (stage === 2 && tile.type === PLASTIC) {
     plasticCleared++;
   }
 
-  // ⭐ 特殊方塊觸發（先觸發）
-  /*if(tile.special === "line4"){
+  // ===== ⭐ 技能連鎖判定 ⭐ =====
+  
+  if (tile.special === "line4") {
+    // 如果是 Shorty 被觸發，立刻發動十字射線
     triggerRandomLine(y, x);
-  }*/
-// ❌ Indigo 不在 destroyTile 自動觸發
-// 👉 完全移除這段
-  if(tile.special === "line5"){
-    triggerJakeChain(y, x); // ⭐ ⭐ ⭐ 直接觸發
+    board[y][x] = null; // Shorty 自己消失
+  } 
+  else if (tile.special === "T") {
+    // 如果是 Indigo 被觸發（被射線掃到或被 Jake 消掉）
+    // 1. 觸發第一段爆炸
+    explodeAroundKeepCenter(x, y);
+    // 2. 加入第二段爆炸隊列
+    pendingExplosions.push({ ref: tile });
+    // 注意：這裡先不要設為 null，因為它需要留在盤面上掉落後再炸第二次
+  } 
+  else if (tile.special === "line5") {
+    // 如果是 Jake 被觸發
+    triggerJakeChain(y, x);
+    board[y][x] = null; // Jake 自己消失
+  } 
+  else {
+    // 普通方塊直接消失
+    board[y][x] = null;
   }
-
-  // ⭐ 最後才刪除
-  board[y][x] = null;
 }
 
-function handleSkillTrigger(x,y){
-  if(stage === 2){
-    movesLeft--; 
-  }
+function handleSkillTrigger(x, y) {
+  if (stage === 2) movesLeft--;
 
-  const {x:sx, y:sy} = pendingSkill;
-  if(x !== sx && y !== sy){
+  const { x: sx, y: sy } = pendingSkill;
+  if (x !== sx && y !== sy) {
     pendingSkill = null;
     return;
   }
@@ -695,27 +720,32 @@ function handleSkillTrigger(x,y){
   isAnimating = true;
   let cleared = [];
 
-  if(y === sy){
-    for(let i=0;i<SIZE;i++) cleared.push([sy, i]);
+  // 根據玩家點擊的位置決定是清橫排還是縱列
+  if (y === sy) {
+    for (let i = 0; i < SIZE; i++) cleared.push([sy, i]);
   } else {
-    for(let i=0;i<SIZE;i++) cleared.push([i, sx]);
+    for (let i = 0; i < SIZE; i++) cleared.push([i, sx]);
   }
 
-  // ⭐ 關鍵修正：直接呼叫 destroyTile 即可，不要在這裡手動加 plasticCleared
-  cleared.forEach(([yy,xx])=>{
-    destroyTile(yy, xx); 
+  // 消除整條線（這會觸發線路上「其他」特殊方塊的連鎖）
+  cleared.forEach(([yy, xx]) => {
+    if (yy === sy && xx === sx) return; // 先跳過中心點，等等單獨處理
+    destroyTile(yy, xx);
   });
 
-  if(board[sy][sx]) board[sy][sx].special = null;
-  destroyTile(sy, sx);
+  // ⭐ 關鍵修正：處理發動技能的中心點
+  if (board[sy][sx]) {
+    board[sy][sx].special = null; // 拔掉技能，防止 destroyTile 再次觸發隨機射線
+    destroyTile(sy, sx);
+  }
 
   let gain = (cleared.length - 1) * 5;
   score += gain;
-  addFloatingText(sx*TILE, sy*TILE+OFFSET_Y, "LINE +" + gain);
+  addFloatingText(sx * TILE, sy * TILE + OFFSET_Y, "LINE +" + gain);
 
   pendingSkill = null;
 
-  setTimeout(()=>{
+  setTimeout(() => {
     dropTiles();
     setTimeout(resolveLoop, 150);
   }, 150);
@@ -955,17 +985,15 @@ function explode3x3(cx,cy){
   addFloatingText(cx*TILE, cy*TILE+OFFSET_Y, "BOOM +" + gain);
 }
 
-function triggerRandomLine(y,x){
-
+function triggerRandomLine(y, x) {
   let isRow = Math.random() < 0.5;
-
-  if(isRow){
-    for(let i=0;i<SIZE;i++){
-      if(i!==x) destroyTile(y,i);
+  if (isRow) {
+    for (let i = 0; i < SIZE; i++) {
+      if (i !== x) destroyTile(y, i); // 使用 destroyTile 才能觸發連鎖
     }
-  }else{
-    for(let i=0;i<SIZE;i++){
-      if(i!==y) destroyTile(i,x);
+  } else {
+    for (let i = 0; i < SIZE; i++) {
+      if (i !== y) destroyTile(i, x); // 使用 destroyTile 才能觸發連鎖
     }
   }
 }
