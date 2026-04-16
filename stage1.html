@@ -682,70 +682,43 @@ function destroyTile(y, x){
 }
 
 function handleSkillTrigger(x,y){
-
   if(stage === 2){
-    movesLeft--; // ⭐ 加這行
+    movesLeft--; 
   }
 
   const {x:sx, y:sy} = pendingSkill;
-
-  // ===== 不同行列 → 取消 =====
   if(x !== sx && y !== sy){
     pendingSkill = null;
     return;
   }
 
   isAnimating = true;
-
-  // ===== 決定清行 or 清列 =====
   let cleared = [];
 
   if(y === sy){
-    // 同一行
-    for(let i=0;i<SIZE;i++){
-      cleared.push([sy, i]);
-    }
-  }else{
-    // 同一列
-    for(let i=0;i<SIZE;i++){
-      cleared.push([i, sx]);
-    }
+    for(let i=0;i<SIZE;i++) cleared.push([sy, i]);
+  } else {
+    for(let i=0;i<SIZE;i++) cleared.push([i, sx]);
   }
 
-  // ===== 消除 =====
-cleared.forEach(([yy,xx])=>{
+  // ⭐ 關鍵修正：直接呼叫 destroyTile 即可，不要在這裡手動加 plasticCleared
+  cleared.forEach(([yy,xx])=>{
+    destroyTile(yy, xx); 
+  });
 
-  if(stage === 2 && board[yy][xx]?.type === PLASTIC){
-    plasticCleared++;
-  }
+  if(board[sy][sx]) board[sy][sx].special = null;
+  destroyTile(sy, sx);
 
-  destroyTile(yy, xx); // ⭐ 改這裡
-});
-
-// ⭐ 先取消特殊屬性，避免二次觸發
-if(board[sy][sx]){
-  board[sy][sx].special = null;
-}
-
-// 再刪除
-destroyTile(sy, sx);
-
-  // ===== 分數（你可以調整）=====
   let gain = (cleared.length - 1) * 5;
   score += gain;
-
-  addFloatingText(
-    sx*TILE,
-    sy*TILE+OFFSET_Y,
-    "LINE +" + gain
-  );
+  addFloatingText(sx*TILE, sy*TILE+OFFSET_Y, "LINE +" + gain);
 
   pendingSkill = null;
 
   setTimeout(()=>{
     dropTiles();
-    setTimeout(resolveLoop,150);
-  },150);
+    setTimeout(resolveLoop, 150);
+  }, 150);
 }
 
 function triggerIndigo(x, y){
@@ -782,7 +755,7 @@ function handleJakeTrigger(x,y){
   
   const {x:sx, y:sy} = pendingJake;
 
-  // 不是周圍 → 當作重新選
+  // 檢查是否為相鄰
   if(!isAdjacent(sx,sy,x,y)){
     pendingJake = null;
     selected = {x,y};
@@ -802,10 +775,9 @@ function handleJakeTrigger(x,y){
   const targetType = target.type;
   let cleared = [];
 
-  // ===== 找全盤同色，但排除特殊方塊 =====
+  // 找全盤同色，但排除特殊方塊
   for(let yy=0; yy<SIZE; yy++){
     for(let xx=0; xx<SIZE; xx++){
-      // ⭐ 關鍵修正：必須同時符合 [顏色相同] 且 [不是特殊方塊]
       if(board[yy][xx] && 
          board[yy][xx].type === targetType && 
          !board[yy][xx].special){ 
@@ -814,12 +786,16 @@ function handleJakeTrigger(x,y){
     }
   }
 
-  // ===== 清除 =====
+  // 消除目標物品
   cleared.forEach(([yy,xx])=>{
     destroyTile(yy, xx); 
   });
 
-  // 移除 Jake 本身
+  // ⭐ 關鍵修正：在刪除 Jake 自己之前，先把它的特殊屬性拔掉
+  // 這樣 destroyTile 就不會因為偵測到 line5 而又去觸發一次隨機全消
+  if(board[sy][sx]){
+    board[sy][sx].special = null; 
+  }
   destroyTile(sy, sx);
 
   let gain = cleared.length * 10;
@@ -959,38 +935,24 @@ function explodeAroundKeepCenter(cx,cy){
 }
 
 function explode3x3(cx,cy){
-
   let cleared = [];
-
   for(let dy=-1;dy<=1;dy++){
     for(let dx=-1;dx<=1;dx++){
-
       let x = cx + dx;
       let y = cy + dy;
-
       if(x<0||x>=SIZE||y<0||y>=SIZE) continue;
-
       cleared.push([y,x]);
     }
   }
 
+  // ⭐ 關鍵修正：同樣移除內部的 plasticCleared++ 邏輯
   cleared.forEach(([y,x])=>{
-
-    if(stage === 2 && board[y][x]?.type === PLASTIC){
-  plasticCleared++;
-}
-
     destroyTile(y, x);
   });
 
   let gain = (cleared.length - 1) * 5;
   score += gain;
-
-  addFloatingText(
-    cx*TILE,
-    cy*TILE+OFFSET_Y,
-    "BOOM +" + gain
-  );
+  addFloatingText(cx*TILE, cy*TILE+OFFSET_Y, "BOOM +" + gain);
 }
 
 function triggerRandomLine(y,x){
