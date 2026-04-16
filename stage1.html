@@ -66,8 +66,7 @@ let board = [];
 let selected = null;
 let isAnimating = false;
 let score = 0;
-let combo = 0;
-let comboCount = 0;
+let comboCount = 0; 
 let timeLeft = 60;
 let gameOver = false;
 let floatingTexts = [];
@@ -84,27 +83,17 @@ let movesLeft = 40;
 let gameStarted = false;
 let pendingExplosions = [];
 let explodingNow = new Set();
-
 let pendingJakeChains = [];
 
-// 畫布 UI 狀態
 let showEndOverlay = false; 
-let overlayConfig = {
-    title: "",
-    subtitle: "",
-    btnText: "",
-    action: "" // 'next', 'retry', 'reload'
-};
+let overlayConfig = { title: "", subtitle: "", btnText: "", action: "" };
 
 // ===== 核心功能 =====
-
 function initBoard(){
   board = [];
   for(let y=0;y<SIZE;y++){
     let row=[];
-    for(let x=0;x<SIZE;x++){
-      row.push(getSafeTile(x,y,row));
-    }
+    for(let x=0;x<SIZE;x++) row.push(getSafeTile(x,y,row));
     board.push(row);
   }
   ensurePlayable();
@@ -122,9 +111,7 @@ function getSafeTile(x,y,row){
 }
 
 function ensurePlayable(){
-  while(findMatches().length !== 0 || !hasPossibleMoves()){
-    shuffleBoard();
-  }
+  while(findMatches().length !== 0 || !hasPossibleMoves()) shuffleBoard();
 }
 
 function hasPossibleMoves(){
@@ -156,75 +143,49 @@ function shuffleBoard(){
 }
 
 // ===== 繪製邏輯 =====
-
-function draw(){
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-
-  // 1. 畫棋盤
-  for(let y=0;y<SIZE;y++){
-    for(let x=0;x<SIZE;x++){
-      drawTile(board[y][x],x,y);
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  for (let y = 0; y < SIZE; y++) {
+    for (let x = 0; x < SIZE; x++) {
+      drawTile(board[y][x], x, y);
     }
   }
 
-  // 2. 畫選取框
   if(selected){
-    ctx.strokeStyle="yellow";
-    ctx.lineWidth=4;
+    ctx.strokeStyle="yellow"; ctx.lineWidth=4;
     ctx.strokeRect(selected.x*TILE, selected.y*TILE+OFFSET_Y, TILE, TILE);
   }
 
-  // 3. 畫 UI 文字
-  ctx.fillStyle="white";
-  ctx.font="18px Arial";
-  ctx.textAlign = "left";
+  ctx.fillStyle="white"; ctx.font="18px Arial"; ctx.textAlign = "left";
   if(stage === 1){
-    ctx.fillText("分數: " + score, 10, 34);
-    ctx.fillText("時間: " + timeLeft, 10, 74);
+    ctx.fillText("分數: " + score, 10, 34); ctx.fillText("時間: " + timeLeft, 10, 74);
   } else {
-    ctx.fillText("清除塑膠袋: " + plasticCleared + "/100", 10, 34);
+    // ⭐ 第二關 UI：同時顯示分數、目標與步數
+    ctx.fillText("分數: " + score, 10, 34);
+    ctx.fillText("已清除塑膠袋: " + plasticCleared + "/100", 250, 34); // 移到右側
     ctx.fillText("剩餘步數: " + movesLeft, 10, 74);
   }
 
-  // 4. 浮動文字
   floatingTexts.forEach(ft=>{
     ctx.fillStyle = ft.text.includes("COMBO") ? "yellow" : "orange";
-    ctx.fillText(ft.text, ft.x, ft.y);
-    ft.y += ft.vy;
-    ft.life--;
+    ctx.font = ft.text.includes("COMBO") ? "bold 24px Arial" : "20px Arial";
+    ctx.fillText(ft.text, ft.x, ft.y); ft.y += ft.vy; ft.life--;
   });
   floatingTexts = floatingTexts.filter(ft => ft.life > 0);
 
-  // 5. 技能提示
   if(pendingSkill) drawHighlight(pendingSkill.x, pendingSkill.y, "red");
   if(pendingJake) drawHighlight(pendingJake.x, pendingJake.y, "black");
   if(pendingIndigo) drawHighlight(pendingIndigo.x, pendingIndigo.y, "blue");
 
-  // 6. Stage 2 橫幅訊息
-  if(stageMessageTimer > 0){
-    ctx.fillStyle = "rgba(255,255,255,0.9)";
-    ctx.font = "bold 24px Arial";
-    ctx.textAlign = "center";
-    ctx.fillText("STAGE 2: 清除 100 個塑膠袋！", canvas.width/2, 50);
-    stageMessageTimer--;
-  }
-
-  // 7. 黑色全屏遮罩 (開場 & 結算)
   if (!gameStarted || showEndOverlay) {
-    ctx.fillStyle = "black";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = "white";
-    ctx.textAlign = "center";
-
+    ctx.fillStyle = "black"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "white"; ctx.textAlign = "center";
     if (!gameStarted) {
-      ctx.font = "24px Arial";
-      ctx.fillText("第 1 關：阻止原生珊瑚礁繼續白化", canvas.width / 2, 140);
-      ctx.font = "18px Arial";
-      ctx.fillText("目標：達到 800 分", canvas.width / 2, 200);
+      ctx.font = "24px Arial"; ctx.fillText("第 1 關：阻止原生珊瑚礁繼續白化", canvas.width / 2, 140);
+      ctx.font = "18px Arial"; ctx.fillText("目標：達到 800 分", canvas.width / 2, 200);
       drawMenuButton("開始遊戲");
     } else if (showEndOverlay) {
-      ctx.font = "24px Arial";
-      ctx.fillText(overlayConfig.title, canvas.width / 2, 140);
+      ctx.font = "24px Arial"; ctx.fillText(overlayConfig.title, canvas.width / 2, 140);
       ctx.font = "18px Arial";
       let lines = overlayConfig.subtitle.split("\n");
       lines.forEach((line, i) => ctx.fillText(line, canvas.width / 2, 200 + i * 30));
@@ -244,38 +205,24 @@ function drawTile(tile,x,y){
 }
 
 function drawHighlight(x, y, color){
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 4;
-  ctx.strokeRect(x*TILE, y*TILE+OFFSET_Y, TILE, TILE);
+  ctx.strokeStyle = color; ctx.lineWidth = 4; ctx.strokeRect(x*TILE, y*TILE+OFFSET_Y, TILE, TILE);
 }
 
 function drawMenuButton(text) {
-  ctx.fillStyle = "green";
-  ctx.fillRect(180, 300, 140, 50);
-  ctx.fillStyle = "white";
-  ctx.font = "bold 20px Arial";
-  ctx.fillText(text, canvas.width / 2, 335);
+  ctx.fillStyle = "green"; ctx.fillRect(180, 300, 140, 50);
+  ctx.fillStyle = "white"; ctx.font = "bold 20px Arial"; ctx.fillText(text, canvas.width / 2, 335);
 }
 
 // ===== 互動邏輯 =====
-
 canvas.addEventListener("click",(e)=>{
   const rect = canvas.getBoundingClientRect();
   const mx = e.clientX - rect.left;
   const my = e.clientY - rect.top;
   const isBtnClicked = (mx >= 180 && mx <= 320 && my >= 300 && my <= 350);
 
-  if (!gameStarted) {
-    if (isBtnClicked) gameStarted = true;
-    return;
-  }
-
-  if (showEndOverlay) {
-    if (isBtnClicked) handleOverlayAction();
-    return;
-  }
-
-  if(isAnimating || gameOver) return;
+  if (!gameStarted) { if (isBtnClicked) gameStarted = true; return; }
+  if (showEndOverlay) { if (isBtnClicked) handleOverlayAction(); return; }
+  if (isAnimating || gameOver) return;
 
   const x = Math.floor(mx/TILE);
   const y = Math.floor((my-OFFSET_Y)/TILE);
@@ -286,464 +233,234 @@ canvas.addEventListener("click",(e)=>{
 
   if(pendingSkill) { handleSkillTrigger(x,y); return; }
   if(pendingJake) { handleJakeTrigger(x,y); return; }
-  if(pendingIndigo) { 
-  handleIndigoTrigger(x,y); 
-  return; 
-}
+  if(pendingIndigo) { handleIndigoTrigger(x,y); return; }
 
   if(tile.special === "line4") { pendingSkill = {x,y}; return; }
   if(tile.special === "line5") { pendingJake = {x,y}; return; }
-  if(tile.special === "T") { 
-  pendingIndigo = {x,y}; 
-  return; 
-}
+  if(tile.special === "T") { pendingIndigo = {x,y}; return; }
 
   if(!selected) { selected = {x,y}; }
   else {
-    if(Math.abs(selected.x-x) + Math.abs(selected.y-y) === 1) {
-      swap(selected, {x,y}); selected = null;
-    } else {
-      selected = {x,y};
-    }
+    if(Math.abs(selected.x-x) + Math.abs(selected.y-y) === 1) { swap(selected, {x,y}); selected = null; }
+    else { selected = {x,y}; }
   }
 });
 
-// ===== 修正後的 關卡跳轉邏輯 =====
 function handleOverlayAction() {
-    showEndOverlay = false;
-    // 這裡先不要重置 gameOver，等按下「開始挑戰」再重置
-
+    showEndOverlay = false; gameOver = false;
     if (overlayConfig.action === 'next') {
-        // 點擊進入第二關按鈕
-        stage = 2; // 關鍵：立刻切換 stage，讓計時器停止對第一關的監控
-        showEndOverlay = true;
+        stage = 2; showEndOverlay = true;
         overlayConfig = {
             title: "第 2 關：清理水母樂園",
             subtitle: "水母樂園充滿了塑膠垃圾！\n\n關卡目標：清除 100 個塑膠袋\n限制：40 步以內",
-            btnText: "開始挑戰",
-            action: 'startStage2'
+            btnText: "開始挑戰", action: 'startStage2'
         };
     } else if (overlayConfig.action === 'startStage2') {
-        // 點擊任務說明頁的「開始挑戰」
-        plasticCleared = 0;
-        movesLeft = 40;
-        gameOver = false; // 正式開始遊戲
-        timeUp = false;
-        initBoard();
+        plasticCleared = 0; movesLeft = 40; initBoard();
     } else if (overlayConfig.action === 'retry') {
-        stage = 1;
-        score = 0;
-        timeLeft = 60;
-        gameOver = false;
-        timeUp = false;
-        initBoard();
+        stage = 1; score = 0; timeLeft = 60; initBoard();
     } else if (overlayConfig.action === 'reload') {
         location.reload();
     }
 }
 
-// ===== 遊戲機制 (消除、掉落、連鎖) 簡化示意 =====
-// (此處保留你原本的邏輯函數：swap, findMatches, resolveLoop, dropTiles, destroyTile... 等)
-// 注意：請確保在 resolveLoop 結尾處判斷 Stage 2 的勝負
-
+// ===== 核心消除邏輯 =====
 function findMatches(){
   let groups=[];
-
-  // 橫
   for(let y=0;y<SIZE;y++){
     let count=1;
     for(let x=1;x<SIZE;x++){
-      if(!board[y][x]||!board[y][x-1]){
-        count=1; continue;
-      }
-
-if(isJustCreated(y,x) || isJustCreated(y,x-1)){
-  count = 1;
-  continue;
-}
-
-      if(
-  board[y][x] &&
-  board[y][x-1] &&
-  !board[y][x].special &&
-  !board[y][x-1].special &&
-  board[y][x].type === board[y][x-1].type
-){
-        count++;
-      }else{
-        if(count>=3){
-          let g=[];
-          for(let k=0;k<count;k++) g.push([y,x-1-k]);
-          groups.push(g);
-        }
-        count=1;
-      }
+      if(board[y][x] && board[y][x-1] && !board[y][x].special && !board[y][x-1].special && board[y][x].type === board[y][x-1].type && !isJustCreated(y,x) && !isJustCreated(y,x-1)) count++;
+      else { if(count>=3){ let g=[]; for(let k=0;k<count;k++) g.push([y,x-1-k]); groups.push(g); } count=1; }
     }
-    if(count>=3){
-      let g=[];
-      for(let k=0;k<count;k++) g.push([y,SIZE-1-k]);
-      groups.push(g);
-    }
+    if(count>=3){ let g=[]; for(let k=0;k<count;k++) g.push([y,SIZE-1-k]); groups.push(g); }
   }
-
-  // 直
   for(let x=0;x<SIZE;x++){
     let count=1;
     for(let y=1;y<SIZE;y++){
-      if(!board[y][x]||!board[y-1][x]){
-        count=1; continue;
-      }
-
-if(isJustCreated(y,x) || isJustCreated(y-1,x)){
-  count = 1;
-  continue;
-}
-
-      if(
-  board[y][x] &&
-  board[y-1][x] &&
-  !board[y][x].special &&
-  !board[y-1][x].special &&
-  board[y][x].type === board[y-1][x].type
-){
-        count++;
-      }else{
-        if(count>=3){
-          let g=[];
-          for(let k=0;k<count;k++) g.push([y-1-k,x]);
-          groups.push(g);
-        }
-        count=1;
-      }
+      if(board[y][x] && board[y-1][x] && !board[y][x].special && !board[y-1][x].special && board[y][x].type === board[y-1][x].type && !isJustCreated(y,x) && !isJustCreated(y-1,x)) count++;
+      else { if(count>=3){ let g=[]; for(let k=0;k<count;k++) g.push([y-1-k,x]); groups.push(g); } count=1; }
     }
-    if(count>=3){
-      let g=[];
-      for(let k=0;k<count;k++) g.push([SIZE-1-k,x]);
-      groups.push(g);
-    }
+    if(count>=3){ let g=[]; for(let k=0;k<count;k++) g.push([SIZE-1-k,x]); groups.push(g); }
   }
-
   return groups;
 }
 
 function resolveLoop() {
     let groups = mergeGroups(findMatches());
 
-    // --- 分支：盤面已穩定，沒有更多匹配 ---
     if (groups.length === 0) {
-        
-        // 處理延遲觸發（Jake 或 Indigo 的爆炸）
+        if (comboCount >= 2) {
+            let bonus = comboCount * 10;
+            score += bonus;
+            addFloatingText(200, 80, "COMBO +" + bonus);
+        }
+        comboCount = 0;
+
         if (pendingJakeChains.length > 0 || pendingExplosions.length > 0) {
-            // (這部分保留你原本的延遲邏輯)
             if(pendingJakeChains.length > 0){
                 let j = pendingJakeChains.shift();
                 let found = null;
                 for(let y=0;y<SIZE;y++) for(let x=0;x<SIZE;x++) if(board[y][x] === j.ref) found = {x, y};
                 if(found) triggerJakeChain(found.y, found.x);
             }
-            // 找到 resolveLoop 裡面處理 pendingExplosions 的部分，修改如下：
-if (pendingExplosions.length > 0) {
-  let exp = pendingExplosions.shift();
-
-  setTimeout(() => {
-    let found = null;
-    for (let y = 0; y < SIZE; y++) {
-      for (let x = 0; x < SIZE; x++) {
-        if (board[y][x] === exp.ref) {
-          found = { x, y };
-        }
-      }
-    }
-
-    if (found) {
-      explode3x3(found.x, found.y); // 第二段爆炸
-      board[found.y][found.x] = null; // ⭐ 關鍵：炸完後 Indigo 終於消失了
-    }
-
-    setTimeout(() => {
-      dropTiles();
-      setTimeout(resolveLoop, 150);
-    }, 150);
-  }, 200);
-
-  return;
-}
-        }
-
-        // ⭐⭐⭐ [修正] 穩定後的勝負判定 ⭐⭐⭐
-        if (stage === 2) {
-            if (plasticCleared >= 100) {
-                showResult(true); 
-                return;
-            } else if (movesLeft <= 0) {
-                showResult(false); 
+            if(pendingExplosions.length > 0){
+                let exp = pendingExplosions.shift();
+                setTimeout(()=>{
+                    let found = null;
+                    for(let y=0;y<SIZE;y++) for(let x=0;x<SIZE;x++) if(board[y][x] === exp.ref) found = {x, y};
+                    if(found) { 
+                        explode3x3(found.x, found.y); 
+                        board[found.y][found.x] = null; 
+                    }
+                    setTimeout(()=>{ dropTiles(); setTimeout(resolveLoop, 150); }, 150);
+                }, 200);
                 return;
             }
         }
 
-        // 結束動畫狀態
-        ensurePlayable();
-        isAnimating = false;
-        combo = 0;
-        comboCount = 0;
-        lastSwap = null;
-        pendingExplosions = [];
-        return;
+        if (stage === 2) {
+            if (plasticCleared >= 100) { showResult(true); return; }
+            else if (movesLeft <= 0) { showResult(false); return; }
+        }
+        ensurePlayable(); isAnimating = false; lastSwap = null; return;
     }
 
-    // --- 分支：處理消除 ---
     let group = groups[0];
-    combo++;
     comboCount++;
 
-    // ⭐⭐⭐ [修正] 直線優先邏輯 ⭐⭐⭐
-    let rowCounts = {};
-    let colCounts = {};
-    group.forEach(([y, x]) => {
-        rowCounts[y] = (rowCounts[y] || 0) + 1;
-        colCounts[x] = (colCounts[x] || 0) + 1;
+    let rowCounts = {}, colCounts = {};
+    group.forEach(([y, x]) => { 
+        rowCounts[y] = (rowCounts[y] || 0) + 1; 
+        colCounts[x] = (colCounts[x] || 0) + 1; 
     });
-
-    // 找出該群組中在同一行或同一列的最大連續數
-    let maxLine = Math.max(
-        ...Object.values(rowCounts), 
-        ...Object.values(colCounts)
-    );
-
-    let base = 0;
-    let special = null;
-
-    // 優先判定直線長度，不論是否有旁支
-    if (maxLine >= 5) {
-        base = 35;
-        special = "line5"; // 生成 Jake
-   } else if (group.length >= 5 || (new Set(group.map(p=>p[0])).size >= 2 && new Set(group.map(p=>p[1])).size >= 2)) {
-        // T型、L型且長度不足5
-        base = 25;
-        special = "T"; // 生成 Indigo
-   } else if (maxLine === 4) {
-        base = 20;
-        special = "line4"; // 生成 Shorty
+    let maxLine = Math.max(...Object.values(rowCounts), ...Object.values(colCounts));
     
-    } else {
-        base = 10;
-    }
+    let base = 10, special = null;
+    if (maxLine >= 5) { base = 35; special = "line5"; }
+    else if (group.length >= 5 || (new Set(group.map(p=>p[0])).size >= 2 && new Set(group.map(p=>p[1])).size >= 2)) { base = 25; special = "T"; }
+    else if (maxLine === 4) { base = 20; special = "line4"; }
 
     score += base;
-
-    // 計算文字浮動位置
     let avgX = 0, avgY = 0;
     group.forEach(([y, x]) => { avgX += x; avgY += y; });
     addFloatingText((avgX/group.length)*TILE, (avgY/group.length)*TILE+OFFSET_Y, "+" + base);
 
-    // 決定特殊方塊生成位置 (優先用玩家交換的位置)
     let cy, cx;
     if (lastSwap) {
         let [a, b] = lastSwap;
         if (group.some(([y, x]) => y === a.y && x === a.x)) { cy = a.y; cx = a.x; }
         else if (group.some(([y, x]) => y === b.y && x === b.x)) { cy = b.y; cx = b.x; }
-        else { let center = group[Math.floor(group.length / 2)]; cy = center[0]; cx = center[1]; }
-    } else {
-        let center = group[Math.floor(group.length / 2)];
-        cy = center[0]; cx = center[1];
-    }
+        else { cy = group[0][0]; cx = group[0][1]; }
+    } else { cy = group[0][0]; cx = group[0][1]; }
 
-    let originalType = board[cy][cx] ? board[cy][cx].type : Math.floor(Math.random() * TYPES);
+    let originalType = board[cy][cx] ? board[cy][cx].type : 0;
 
-    // 執行消除
+    // ⭐ 核心修正：執行消除
     group.forEach(([y, x]) => {
-        if (y === cy && x === cx) return;
-        destroyTile(y, x);
+        if (y === cy && x === cx) {
+            // 中心點轉化：如果原本是塑膠袋，雖然不呼叫 destroyTile，但要手動計數
+            if (stage === 2 && board[y][x]?.type === PLASTIC) {
+                plasticCleared++;
+            }
+        } else {
+            // 其他方塊正常銷毀並計數
+            destroyTile(y, x);
+        }
     });
 
-    // 生成特殊方塊或刪除中心
     if (special) {
         board[cy][cx] = { type: originalType, special: special };
         justCreatedSpecial = { y: cy, x: cx };
     } else {
-        destroyTile(cy, cx);
+        board[cy][cx] = null; 
     }
 
     draw();
-
-    // 掉落與遞迴
     setTimeout(() => {
         dropTiles();
         draw();
         setTimeout(resolveLoop, 150);
     }, 150);
-
+    
     justCreatedSpecial = null;
     explodingNow.clear();
-
-    // 消除途中若已達標也可立即判定
-    if (stage === 2 && plasticCleared >= 100) {
-        showResult(true);
-    }
 }
 
-// ... 此處省略你原本的 findMatches, resolveLoop 等長函數，請維持原本程式碼內容 ...
-// ... 但請確保在 resolveLoop 判定勝利的地方呼叫 showResult() ...
-
-// 這裡提供你原本 resolveLoop 中需要修正的 Stage 2 判斷點：
-/*
-  if(stage === 2){
-    if(plasticCleared >= 100){ showResult(true); return; }
-    if(movesLeft <= 0 && !isAnimating){ showResult(false); return; }
-  }
-*/
-
-// ===== 定時器與迴圈 =====
-
-function startTimer(){
-  setInterval(()=>{
-    // 關鍵修正：如果正在顯示遮罩(Overlay)或是已經不是第一關，計時器就不準再觸發第一關結算
-    if(!gameStarted || gameOver || stage !== 1 || showEndOverlay) return;
-
-    if(timeLeft > 0){
-      timeLeft--;
-    }
-
-    if (timeLeft <= 0 && !isAnimating) {
-        gameOver = true;
-        showEndOverlay = true; 
-
-        if (score >= 800) {
-            overlayConfig = {
-                title: "任務完成！",
-                subtitle: "你阻止了原生珊瑚礁繼續白化!\n分數: " + score,
-                btnText: "進入第二關",
-                action: "next"
-            };
-        } else {
-            overlayConfig = {
-                title: "任務失敗！",
-                subtitle: "原生珊瑚礁白化加速，請再接再厲!\n分數: " + score,
-                btnText: "重新挑戰",
-                action: "retry"
-            };
-        }
-    }
-  }, 1000);
-}
-
-function showResult(success) {
-    gameOver = true;
-    showEndOverlay = true;
-    if (success) {
-        overlayConfig = {
-            title: "任務完成！",
-            subtitle: "你拯救了水母樂園！",
-            btnText: "再玩一次",
-            action: "reload"
-        };
-    } else {
-        overlayConfig = {
-            title: "任務失敗！",
-            subtitle: "水母樂園充斥著塑膠垃圾...",
-            btnText: "重新開始",
-            action: "reload"
-        };
-    }
-}
-
-function gameLoop(){
-  draw();
-  requestAnimationFrame(gameLoop);
-}
-
-// ===== 掉落 =====
-function dropTiles(){
-  for(let x=0;x<SIZE;x++){
-    let col=[];
-for(let y=SIZE-1;y>=0;y--){
-      if(board[y][x]) {
-        delete board[y][x]._triggered; // ⭐ 重置
-        col.push(board[y][x]);
-      }
-    }
-    while(col.length<SIZE) col.push(randomTile());
-
-    for(let y=SIZE-1;y>=0;y--){
-      board[y][x]=col[SIZE-1-y];
-    }
-  }
-}
-
-function destroyTile(y, x) {
-  const tile = board[y]?.[x];
+// ===== 技能與工具函式 =====
+function destroyTile(row, col) {
+  const tile = board[row]?.[col];
   if (!tile || tile._triggered) return;
-  
-  // 標記為已觸發，防止連鎖時發生死迴圈（例如兩個 Indigo 互炸）
   tile._triggered = true;
 
-  // Stage 2 計數
-  if (stage === 2 && tile.type === PLASTIC) {
+  // 第二關塑膠袋計數 (僅限普通方塊)
+  if (stage === 2 && tile.type === PLASTIC && !tile.special) {
     plasticCleared++;
   }
 
-  // ===== ⭐ 技能連鎖判定 ⭐ =====
-  
-  if (tile.special === "line4") {
-    // 如果是 Shorty 被觸發，立刻發動十字射線
-    triggerRandomLine(y, x);
-    board[y][x] = null; // Shorty 自己消失
+  const spec = tile.special;
+
+  if (spec === "line4") {
+    // 被動連鎖 Shorty：將自己的 row, col 傳進去
+    triggerRandomLine(row, col);
+    board[row][col] = null;
   } 
-  else if (tile.special === "T") {
-    // 如果是 Indigo 被觸發（被射線掃到或被 Jake 消掉）
-    // 1. 觸發第一段爆炸
-    explodeAroundKeepCenter(x, y);
-    // 2. 加入第二段爆炸隊列
+  else if (spec === "T") {
+    // 被動連鎖 Indigo
+    explodeAroundKeepCenter(col, row);
     pendingExplosions.push({ ref: tile });
-    // 注意：這裡先不要設為 null，因為它需要留在盤面上掉落後再炸第二次
+    // 注意：Indigo 暫時不設 null，等待 resolveLoop 第二次爆炸
   } 
-  else if (tile.special === "line5") {
-    // 如果是 Jake 被觸發
-    triggerJakeChain(y, x);
-    board[y][x] = null; // Jake 自己消失
+  else if (spec === "line5") {
+    // 被動連鎖 Jake
+    triggerJakeChain(row, col);
+    board[row][col] = null;
   } 
   else {
-    // 普通方塊直接消失
-    board[y][x] = null;
+    // 普通方塊
+    board[row][col] = null;
   }
 }
 
-function handleSkillTrigger(x, y) {
+function handleSkillTrigger(clickedX, clickedY) {
   if (stage === 2) movesLeft--;
 
   const { x: sx, y: sy } = pendingSkill;
-  if (x !== sx && y !== sy) {
-    pendingSkill = null;
+  // 立刻重置，防止連鎖反應期間發生狀態混亂
+  pendingSkill = null; 
+
+  if (clickedX !== sx && clickedY !== sy) {
     return;
   }
 
   isAnimating = true;
-  let cleared = [];
+  let clearedCoords = [];
 
-  // 根據玩家點擊的位置決定是清橫排還是縱列
-  if (y === sy) {
-    for (let i = 0; i < SIZE; i++) cleared.push([sy, i]);
+  // 判定是橫向還是縱向
+  if (clickedY === sy) {
+    // 點擊位置與 Shorty 在同一橫排 -> 消橫排
+    for (let i = 0; i < SIZE; i++) clearedCoords.push([sy, i]);
   } else {
-    for (let i = 0; i < SIZE; i++) cleared.push([i, sx]);
+    // 點擊位置與 Shorty 在同一直行 -> 消直行
+    for (let i = 0; i < SIZE; i++) clearedCoords.push([i, sx]);
   }
 
-  // 消除整條線（這會觸發線路上「其他」特殊方塊的連鎖）
-  cleared.forEach(([yy, xx]) => {
-    if (yy === sy && xx === sx) return; // 先跳過中心點，等等單獨處理
-    destroyTile(yy, xx);
+  // 執行消除 (排除中心點，等等單獨處理)
+  clearedCoords.forEach(([r, c]) => {
+    if (r !== sy || c !== sx) {
+      destroyTile(r, c);
+    }
   });
 
-  // ⭐ 關鍵修正：處理發動技能的中心點
-  if (board[sy][sx]) {
-    board[sy][sx].special = null; // 拔掉技能，防止 destroyTile 再次觸發隨機射線
+  // 處理發動技能的這隻 Shorty 本身
+  if (board[sy] && board[sy][sx]) {
+    board[sy][sx].special = null; // 拔掉技能，防止重複觸發隨機射線
     destroyTile(sy, sx);
   }
 
-  let gain = (cleared.length - 1) * 5;
+  let gain = (clearedCoords.length - 1) * 5;
   score += gain;
   addFloatingText(sx * TILE, sy * TILE + OFFSET_Y, "LINE +" + gain);
-
-  pendingSkill = null;
 
   setTimeout(() => {
     dropTiles();
@@ -751,341 +468,192 @@ function handleSkillTrigger(x, y) {
   }, 150);
 }
 
-function triggerIndigo(x, y){
-
-if(stage === 2){
-    movesLeft--; // ⭐ 加這行
-  }
-
-  const tile = board[y][x];
-
-  // 防止重複加入
-  if(pendingExplosions.some(p => p.ref === tile)){
-    return;
-  }
-
-  isAnimating = true;
-
-  explodeAroundKeepCenter(x, y);
-
-  pendingExplosions.push({
-    ref: tile // ⭐ 改這裡
-  });
-
-  setTimeout(()=>{
-    dropTiles();
-    setTimeout(resolveLoop,150);
-  },150);
-}
-
 function handleJakeTrigger(x,y){
-  if(stage === 2){
-    movesLeft--; 
-  }
-  
+  if(stage === 2) movesLeft--;
   const {x:sx, y:sy} = pendingJake;
-
-  // 檢查是否為相鄰
-  if(!isAdjacent(sx,sy,x,y)){
-    pendingJake = null;
-    selected = {x,y};
-    return;
-  }
-
+  if(!isAdjacent(sx,sy,x,y)){ pendingJake = null; selected = {x,y}; return; }
   const target = board[y]?.[x];
-
-  // 只能點普通方塊
-  if(!target || target.special){
-    pendingJake = null;
-    return;
-  }
-
-  isAnimating = true;
-
-  const targetType = target.type;
-  let cleared = [];
-
-  // 找全盤同色，但排除特殊方塊
-  for(let yy=0; yy<SIZE; yy++){
-    for(let xx=0; xx<SIZE; xx++){
-      if(board[yy][xx] && 
-         board[yy][xx].type === targetType && 
-         !board[yy][xx].special){ 
-        cleared.push([yy,xx]);
-      }
-    }
-  }
-
-  // 消除目標物品
-  cleared.forEach(([yy,xx])=>{
-    destroyTile(yy, xx); 
-  });
-
-  // ⭐ 關鍵修正：在刪除 Jake 自己之前，先把它的特殊屬性拔掉
-  // 這樣 destroyTile 就不會因為偵測到 line5 而又去觸發一次隨機全消
-  if(board[sy][sx]){
-    board[sy][sx].special = null; 
-  }
+  if(!target || target.special){ pendingJake = null; return; }
+  isAnimating = true; const targetType = target.type; let cleared = [];
+  for(let yy=0; yy<SIZE; yy++) for(let xx=0; xx<SIZE; xx++) if(board[yy][xx] && board[yy][xx].type === targetType && !board[yy][xx].special) cleared.push([yy,xx]);
+  cleared.forEach(([yy,xx])=> destroyTile(yy, xx));
+  if(board[sy][sx]) board[sy][sx].special = null;
   destroyTile(sy, sx);
-
-  let gain = cleared.length * 10;
-  score += gain;
-
+  let gain = cleared.length * 5; score += gain;
   addFloatingText(sx*TILE, sy*TILE+OFFSET_Y, "COLOR +" + gain);
-
-  pendingJake = null;
-
-  setTimeout(()=>{
-    dropTiles();
-    setTimeout(resolveLoop, 150);
-  }, 150);
+  pendingJake = null; setTimeout(()=>{ dropTiles(); setTimeout(resolveLoop, 150); }, 150);
 }
 
-// ===== 交換 =====
-function swap(a,b){
-  isAnimating = true;
-
-  combo = 0;
-  comboCount = 0;
-
-  lastSwap = [a, b];
-
-  // 先交換
-  [board[a.y][a.x], board[b.y][b.x]] =
-  [board[b.y][b.x], board[a.y][a.x]];
-
-  setTimeout(()=>{
-
-    let matches = findMatches();
-
-    if(matches.length === 0){
-
-      // ❌ 無效交換 → 換回去
-      [board[a.y][a.x], board[b.y][b.x]] =
-      [board[b.y][b.x], board[a.y][a.x]];
-
-      isAnimating = false;
-
-    }else{
-
-      // ✅ 有成功消除 → 才扣步數
-      if(stage === 2){
-        movesLeft--;
-      }
-
-      resolveLoop();
-    }
-
-  },150);
-}
-
-function mergeGroups(groups){
-  let merged=[];
-
-  groups.forEach(group=>{
-    let added=false;
-
-    for(let m of merged){
-      if(group.some(([y,x]) =>
-        m.some(([y2,x2]) => y===y2 && x===x2)
-      )){
-        m.push(...group);
-        added=true;
-        break;
-      }
-    }
-
-    if(!added){
-      merged.push([...group]);
-    }
-  });
-
-  // 去重
-  return merged.map(group=>{
-    let set=new Set(group.map(([y,x])=>y+"_"+x));
-    return Array.from(set).map(s=>{
-      let [y,x]=s.split("_").map(Number);
-      return [y,x];
-    });
-  });
-}
-
-function isJustCreated(y,x){
-  return justCreatedSpecial &&
-         justCreatedSpecial.y === y &&
-         justCreatedSpecial.x === x;
-}
-
-function addFloatingText(x, y, text){
-  floatingTexts.push({
-    x: x,
-    y: y,
-    text: text,
-    life: 60,        // 幀數（約1秒）
-    vy: -0.5         // 往上速度
-  });
-}
-
-function randomTile(){
-  return {
-    type: Math.floor(Math.random()*TYPES),
-    special: null
-  };
-}
-
-function explodeAroundKeepCenter(cx,cy){
-
-  let hit = 0; // ⭐ 新增
-
-  for(let dy=-1;dy<=1;dy++){
-    for(let dx=-1;dx<=1;dx++){
-
-      let x = cx + dx;
-      let y = cy + dy;
-
-      if(x<0||x>=SIZE||y<0||y>=SIZE) continue;
-      if(x===cx && y===cy) continue;
-
-      if(board[y][x]){ // ⭐ 有東西才算
-        hit++;
-      }
-
-      destroyTile(y,x);
-    }
-  }
-
-  let gain = hit * 5; // ⭐ 改這裡
-  score += gain;
-
-  addFloatingText(
-    cx*TILE,
-    cy*TILE+OFFSET_Y,
-    "BOOM +" + gain
-  );
-}
-
-function explode3x3(cx,cy){
-  let cleared = [];
-  for(let dy=-1;dy<=1;dy++){
-    for(let dx=-1;dx<=1;dx++){
-      let x = cx + dx;
-      let y = cy + dy;
-      if(x<0||x>=SIZE||y<0||y>=SIZE) continue;
-      cleared.push([y,x]);
-    }
-  }
-
-  // ⭐ 關鍵修正：同樣移除內部的 plasticCleared++ 邏輯
-  cleared.forEach(([y,x])=>{
-    destroyTile(y, x);
-  });
-
-  let gain = (cleared.length - 1) * 5;
-  score += gain;
-  addFloatingText(cx*TILE, cy*TILE+OFFSET_Y, "BOOM +" + gain);
-}
-
-function triggerRandomLine(y, x) {
-  let isRow = Math.random() < 0.5;
-  if (isRow) {
-    for (let i = 0; i < SIZE; i++) {
-      if (i !== x) destroyTile(y, i); // 使用 destroyTile 才能觸發連鎖
-    }
-  } else {
-    for (let i = 0; i < SIZE; i++) {
-      if (i !== y) destroyTile(i, x); // 使用 destroyTile 才能觸發連鎖
-    }
-  }
-}
-
-function isAdjacent(sx,sy,x,y){
-  return Math.abs(sx-x)<=1 && Math.abs(sy-y)<=1 && !(sx===x && sy===y);
+function handleIndigoTrigger(x,y){
+  const {x:sx, y:sy} = pendingIndigo;
+  if(x === sx && y === sy) { pendingIndigo = null; return; }
+  if(!isAdjacent(sx, sy, x, y)){ pendingIndigo = null; selected = {x,y}; return; }
+  if(stage === 2) movesLeft--;
+  const tile = board[sy]?.[sx];
+  if(!tile || tile.special !== "T"){ pendingIndigo = null; return; }
+  isAnimating = true; explodeAroundKeepCenter(sx, sy);
+  pendingExplosions.push({ ref: tile }); pendingIndigo = null;
+  setTimeout(()=>{ dropTiles(); setTimeout(resolveLoop,150); },150);
 }
 
 function triggerJakeChain(y,x){
   let neighbors = [];
-
-  for(let dy=-1;dy<=1;dy++){
-    for(let dx=-1;dx<=1;dx++){
-      let nx = x + dx;
-      let ny = y + dy;
-      if(nx<0||nx>=SIZE||ny<0||ny>=SIZE) continue;
-      if(nx===x && ny===y) continue;
-
-      if(board[ny][nx] && !board[ny][nx].special){
-        neighbors.push([ny,nx]);
-      }
-    }
+  for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){
+    let nx = x + dx, ny = y + dy;
+    if(nx<0||nx>=SIZE||ny<0||ny>=SIZE||(nx===x && ny===y)) continue;
+    if(board[ny][nx] && !board[ny][nx].special) neighbors.push([ny,nx]);
   }
-
   if(neighbors.length === 0) return;
-
   let [ty,tx] = neighbors[Math.floor(Math.random()*neighbors.length)];
   let targetType = board[ty][tx].type;
+  for(let yy=0; yy<SIZE; yy++) for(let xx=0; xx<SIZE; xx++) if(board[yy][xx] && board[yy][xx].type === targetType && !board[yy][xx].special) destroyTile(yy,xx);
+}
 
-  for(let yy=0; yy<SIZE; yy++){
-    for(let xx=0; xx<SIZE; xx++){
-      // ⭐ 關鍵修正：自動連鎖時也排除特殊方塊
-      if(board[yy][xx] && 
-         board[yy][xx].type === targetType && 
-         !board[yy][xx].special){
-        destroyTile(yy,xx);
+function explodeAroundKeepCenter(cx,cy){
+  let hit = 0;
+  for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){
+    let x = cx + dx, y = cy + dy;
+    if(x<0||x>=SIZE||y<0||y>=SIZE||(x===cx && y===cy)) continue;
+    if(board[y][x]) hit++;
+    destroyTile(y,x);
+  }
+  let gain = hit * 5; score += gain;
+  addFloatingText(cx*TILE, cy*TILE+OFFSET_Y, "BOOM +" + gain);
+}
+
+function explode3x3(cx,cy){
+  let hit = 0;
+  for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){
+    let x = cx + dx, y = cy + dy;
+    if(x<0||x>=SIZE||y<0||y>=SIZE) continue;
+    if(board[y][x]) hit++;
+    destroyTile(y, x);
+  }
+  let gain = (hit - 1) * 5; score += gain;
+  addFloatingText(cx*TILE, cy*TILE+OFFSET_Y, "BOOM +" + gain);
+}
+
+function triggerRandomLine(originRow, originCol) {
+  const isRow = Math.random() < 0.5;
+
+  if (isRow) {
+    // 消除整橫排 (Row)
+    for (let i = 0; i < SIZE; i++) {
+      if (i !== originCol) {
+        destroyTile(originRow, i); 
+      }
+    }
+  } else {
+    // 消除整直行 (Column)
+    for (let i = 0; i < SIZE; i++) {
+      if (i !== originRow) {
+        destroyTile(i, originCol);
       }
     }
   }
 }
 
-function handleIndigoTrigger(x,y){
-
-  const {x:sx, y:sy} = pendingIndigo;
-
-  // ❌ 點自己 → 取消
-  if(x === sx && y === sy){
-    pendingIndigo = null;
-    return;
-  }
-
-  // ❌ 不在九宮格 → 取消
-  if(!isAdjacent(sx, sy, x, y)){
-    pendingIndigo = null;
-    selected = {x,y};
-    return;
-  }
-
-  if(stage === 2){
-    movesLeft--;
-  }
-
-  const tile = board[sy]?.[sx];
-  if(!tile || tile.special !== "T"){
-    pendingIndigo = null;
-    return;
-  }
-
+function swap(a,b){
   isAnimating = true;
-
-  // ⭐ 觸發爆炸（第一段）
-  explodeAroundKeepCenter(sx, sy);
-
-  // ⭐ 加入第二段爆炸隊列（你原本就有）
-  pendingExplosions.push({
-    ref: tile
-  });
-
-  // ❌ 不要刪自己！！！
-  // destroyTile(sy, sx);
-
-  pendingIndigo = null;
-
+  [board[a.y][a.x], board[b.y][b.x]] = [board[b.y][b.x], board[a.y][a.x]];
   setTimeout(()=>{
-    dropTiles();
-    setTimeout(resolveLoop,150);
-  },150);
+    if(findMatches().length === 0){ [board[a.y][a.x], board[b.y][b.x]] = [board[b.y][b.x], board[a.y][a.x]]; isAnimating = false; }
+    else { if(stage === 2) movesLeft--; lastSwap = [a, b]; resolveLoop(); }
+  }, 150);
 }
 
-// 由於程式碼長度限制，請將你原本程式碼中關於 
-// destroyTile, triggerIndigo, handleSkillTrigger, handleJakeTrigger, resolveLoop, findMatches, mergeGroups, dropTiles 
-// 完整貼回此處即可。
+function mergeGroups(groups){
+  let merged=[];
+  groups.forEach(group=>{
+    let added=false;
+    for(let m of merged){ if(group.some(([y,x]) => m.some(([y2,x2]) => y===y2 && x===x2) )){ m.push(...group); added=true; break; } }
+    if(!added) merged.push([...group]);
+  });
+  return merged.map(group=>{ let set=new Set(group.map(([y,x])=>y+"_"+x)); return Array.from(set).map(s=>{ let [y,x]=s.split("_").map(Number); return [y,x]; }); });
+}
+
+function dropTiles(){
+  for(let x=0;x<SIZE;x++){
+    let col=[];
+    for(let y=SIZE-1;y>=0;y--) if(board[y][x]) { delete board[y][x]._triggered; col.push(board[y][x]); }
+    while(col.length<SIZE) col.push(randomTile());
+    for(let y=SIZE-1;y>=0;y--) board[y][x]=col[SIZE-1-y];
+  }
+}
+
+function isJustCreated(y,x){ return justCreatedSpecial && justCreatedSpecial.y === y && justCreatedSpecial.x === x; }
+function isAdjacent(sx,sy,x,y){ return Math.abs(sx-x)<=1 && Math.abs(sy-y)<=1 && !(sx===x && sy===y); }
+// 修改此函數，增加 duration 參數，預設為 60 幀 (1秒)
+function addFloatingText(x, y, text, duration = 60) {
+  floatingTexts.push({
+    x: x,
+    y: y,
+    text: text,
+    life: duration, // 使用傳入的時間
+    vy: -0.5
+  });
+}
+function randomTile(){ return { type: Math.floor(Math.random()*TYPES), special: null }; }
+
+function startTimer(){
+  setInterval(()=>{
+    if(!gameStarted || gameOver || stage !== 1 || showEndOverlay) return;
+    if(timeLeft > 0) timeLeft--;
+    if (timeLeft <= 0 && !isAnimating) {
+        gameOver = true; showEndOverlay = true; 
+        if (score >= 800) overlayConfig = { title: "任務完成！", subtitle: "你阻止了原生珊瑚礁繼續白化!\n分數: " + score, btnText: "進入第二關", action: "next" };
+        else overlayConfig = { title: "任務失敗！", subtitle: "原生珊瑚礁白化加速，請再接再厲!\n分數: " + score, btnText: "重新挑戰", action: "retry" };
+    }
+  }, 1000);
+}
+
+function showResult(success) {
+  gameOver = true; // 先停止遊戲操作
+
+  if (success && stage === 2) {
+    // 1. 計算步數獎勵
+    let bonus = movesLeft * 50;
+    score += bonus;
+
+    // 2. ⭐ 將座標移至 (200, 80)，與 Combo 顯示位置一致
+    // 設定停留時間為 180 幀 (約 3 秒)
+    addFloatingText(200, 80, "剩餘步數 +" + bonus, 180);
+
+    // 3. 等待 3 秒後再跳出結算黑底頁面
+    setTimeout(() => {
+      showEndOverlay = true;
+      overlayConfig = {
+        title: "任務完成！",
+        subtitle: "你拯救了水母樂園！\n最終分數: " + score,
+        btnText: "再玩一次",
+        action: "reload"
+      };
+    }, 3000);
+
+  } else {
+    // 第一關過關或任何失敗情況，立即顯示畫面
+    showEndOverlay = true;
+    if (success) {
+      // 第一關成功
+      overlayConfig = {
+        title: "任務完成！",
+        subtitle: "你阻止了原生珊瑚礁繼續白化!\n分數: " + score,
+        btnText: "進入第二關",
+        action: "next"
+      };
+    } else {
+      // 失敗邏輯
+      overlayConfig = {
+        title: "任務失敗！",
+        subtitle: stage === 1 ? "原生珊瑚礁白化加速..." : "水母樂園充斥著塑膠垃圾...",
+        btnText: stage === 1 ? "重新挑戰" : "重新開始",
+        action: stage === 1 ? "retry" : "reload"
+      };
+    }
+  }
+}
+
+function gameLoop(){ draw(); requestAnimationFrame(gameLoop); }
 
 </script>
 </body>
