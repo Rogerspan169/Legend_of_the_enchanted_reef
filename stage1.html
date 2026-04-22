@@ -21,14 +21,14 @@
 </head>
 <body>
 
-<canvas id="game" width="500" height="600"></canvas>
+<canvas id="game" width="400" height="500"></canvas>
 
 <script>
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
 const SIZE = 10;
-const TILE = 50;
+const TILE = 40;
 const TYPES = 5;
 const OFFSET_Y = 100;
 const PLASTIC = 0;
@@ -162,7 +162,7 @@ function draw() {
   } else {
     // ⭐ 第二關 UI：同時顯示分數、目標與步數
     ctx.fillText("分數: " + score, 10, 34);
-    ctx.fillText("已清除塑膠袋: " + plasticCleared + "/100", 250, 34); // 移到右側
+    ctx.fillText("已清除塑膠袋: " + plasticCleared + "/100", 205, 34); // 移到右側
     ctx.fillText("剩餘步數: " + movesLeft, 10, 74);
   }
 
@@ -209,7 +209,7 @@ function drawHighlight(x, y, color){
 }
 
 function drawMenuButton(text) {
-  ctx.fillStyle = "green"; ctx.fillRect(180, 300, 140, 50);
+  ctx.fillStyle = "green"; ctx.fillRect(129, 300, 142, 50);
   ctx.fillStyle = "white"; ctx.font = "bold 20px Arial"; ctx.fillText(text, canvas.width / 2, 335);
 }
 
@@ -617,7 +617,7 @@ function showResult(success) {
 
     // 2. ⭐ 將座標移至 (200, 80)，與 Combo 顯示位置一致
     // 設定停留時間為 180 幀 (約 3 秒)
-    addFloatingText(200, 80, "剩餘步數 +" + bonus, 180);
+    addFloatingText(140, 80, "剩餘步數 +" + bonus, 180);
 
     // 3. 等待 3 秒後再跳出結算黑底頁面
     setTimeout(() => {
