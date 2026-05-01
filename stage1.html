@@ -13,10 +13,13 @@
       font-family: Arial, sans-serif;
     }
     canvas {
-      background: #0e3f5a;
-      border: 3px solid white;
-      cursor: pointer;
-    }
+    background: #0e3f5a;
+    border: 3px solid white;
+    /* ⭐ 新增以下三行 */
+    max-width: 100%;    /* 寬度最大就是容器的 100% */
+    height: auto;       /* 高度依比例自動縮放 */
+    display: block;
+}
   </style>
 </head>
 <body>
@@ -214,11 +217,19 @@ function drawMenuButton(text) {
 }
 
 // ===== 互動邏輯 =====
-canvas.addEventListener("click",(e)=>{
-  const rect = canvas.getBoundingClientRect();
-  const mx = e.clientX - rect.left;
-  const my = e.clientY - rect.top;
-  const isBtnClicked = (mx >= 180 && mx <= 320 && my >= 300 && my <= 350);
+canvas.addEventListener("click", (e) => {
+    const rect = canvas.getBoundingClientRect();
+    
+    // ⭐ 計算縮放比例
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+
+    // ⭐ 修正後的座標：(點擊位置 - 畫布左邊距離) * 縮放比例
+    const mx = (e.clientX - rect.left) * scaleX;
+    const my = (e.clientY - rect.top) * scaleY;
+
+    const isBtnClicked = (mx >= 180 && mx <= 320 && my >= 300 && my <= 350);
+    // ... 後續邏輯不變
 
   if (!gameStarted) { if (isBtnClicked) gameStarted = true; return; }
   if (showEndOverlay) { if (isBtnClicked) handleOverlayAction(); return; }
